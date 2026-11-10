@@ -12,39 +12,115 @@ import {
 import { useEffect, useRef } from "react";
 
 type ScreenCreative = {
-  gradient: string;
   image?: string;
 };
 
-const SCREENS: ScreenCreative[] = [
-  { gradient: "linear-gradient(160deg, #06b6d4 0%, #2563eb 100%)" },
-  { gradient: "linear-gradient(160deg, #a855f7 0%, #ec4899 100%)" },
-  { gradient: "linear-gradient(160deg, #f97316 0%, #ef4444 100%)" },
-  { gradient: "linear-gradient(160deg, #14b8a6 0%, #22c55e 100%)" },
-  { gradient: "linear-gradient(160deg, #6366f1 0%, #8b5cf6 100%)" },
-  { gradient: "linear-gradient(160deg, #3b82f6 0%, #06b6d4 100%)" },
-  { gradient: "linear-gradient(160deg, #d946ef 0%, #fb923c 100%)" },
-];
-
-const ANGLE_STEP = 360 / SCREENS.length;
+const FRAME_COUNT = 7;
+const ANGLE_STEP = 360 / FRAME_COUNT;
 const INITIAL_ANGLE = 90;
-const ROTATION_MS = 60_000;
-const SLAB_DEPTHS = [3, 6, 9, 12];
+
+const RX_RATIO = 0.33;
+const RY_RATIO = 0.30;
+const MAX_RX = 640;
+const MAX_RY = 300;
+const CENTER_Y_RATIO = 0.58;
+const ROTATE_SECONDS = 60;
+const BASE_WIDTH = 190;
+
+const MOBILE_BREAKPOINT = 768;
+const MOBILE_RX_RATIO = 0.40;
+const MOBILE_RY_RATIO = 0.18;
+const MOBILE_BASE_WIDTH = 100;
+
+const PERSPECTIVE = 1400;
+const SLAB_DEPTHS = [3, 6, 9, 12, 15, 18] as const;
+const SLAB_COLORS = [
+  "#0d1a3b",
+  "#0c1836",
+  "#0b1631",
+  "#09132c",
+  "#081026",
+  "#060d22",
+] as const;
+
+const FRONT_BEZEL_COLOR = "#0f1d42";
+const FAR_BEZEL_COLOR = "#0a1330";
+const FRONT_SCREEN_COLOR = "#060b18";
+const FAR_SCREEN_COLOR = "#04070f";
+const FAR_SLAB_COLOR = "#04070f";
+const BEZEL_BORDER_COLOR = "#2a4a8f";
+const FAR_BEZEL_BORDER_COLOR = "#15264d";
+const RIM_COLOR = "#3a5fae";
+const FAR_RIM_COLOR = "#1a2d5b";
+
+const SCREENS: ScreenCreative[] = [{}, {}, {}, {}, {}, {}, {}];
+
+function hexToRgb(hex: string): [number, number, number] {
+  const value = hex.replace("#", "");
+
+  return [
+    Number.parseInt(value.slice(0, 2), 16),
+    Number.parseInt(value.slice(2, 4), 16),
+    Number.parseInt(value.slice(4, 6), 16),
+  ];
+}
+
+function mixHex(from: string, to: string, amount: number): string {
+  const clamped = Math.min(1, Math.max(0, amount));
+  const fromRgb = hexToRgb(from);
+  const toRgb = hexToRgb(to);
+
+  const channel = (index: number) =>
+    Math.round(fromRgb[index] + (toRgb[index] - fromRgb[index]) * clamped);
+
+  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+}
+
+function SlabEdge({
+  depth,
+  baseColor,
+  slabDepth,
+}: {
+  depth: MotionValue<number>;
+  baseColor: string;
+  slabDepth: number;
+}) {
+  const backgroundColor = useTransform(depth, (value) =>
+    mixHex(baseColor, FAR_SLAB_COLOR, 1 - value),
+  );
+
+  return (
+    <motion.div
+      className="absolute inset-0"
+      style={{
+        transform: `translateZ(-${slabDepth}px)`,
+        borderRadius: 28,
+        backgroundColor,
+      }}
+    />
+  );
+}
 
 type OrbitFrameProps = {
   screen: ScreenCreative;
   index: number;
   angle: MotionValue<number>;
+  centerX: MotionValue<number>;
+  centerY: MotionValue<number>;
   radiusX: MotionValue<number>;
   radiusY: MotionValue<number>;
+  frameWidth: MotionValue<number>;
 };
 
 function OrbitFrame({
   screen,
   index,
   angle,
+  centerX,
+  centerY,
   radiusX,
   radiusY,
+  frameWidth,
 }: OrbitFrameProps) {
   const frameAngle = useTransform(
     angle,
@@ -56,12 +132,12 @@ function OrbitFrame({
   );
 
   const x = useTransform<number, number>(
-    [radians, radiusX],
-    ([rad, radius]) => Math.cos(rad) * radius,
+    [radians, radiusX, centerX],
+    ([rad, rx, cx]) => cx + Math.cos(rad) * rx,
   );
   const y = useTransform<number, number>(
-    [radians, radiusY],
-    ([rad, radius]) => Math.sin(rad) * radius,
+    [radians, radiusY, centerY],
+    ([rad, ry, cy]) => cy + Math.sin(rad) * ry,
   );
 
   const depth = useTransform(radians, (rad) => (Math.sin(rad) + 1) / 2);
@@ -72,112 +148,109 @@ function OrbitFrame({
     (rad) =>
       -Math.cos(rad) * (30 + 45 * (1 - Math.abs(Math.sin(rad)))),
   );
-  const rotateZ = useTransform(radians, (rad) => Math.cos(rad) * 3);
-  const overlayOpacity = useTransform(depth, (value) => (1 - value) * 0.75);
-  const contentOpacity = useTransform(
-    depth,
-    (value) => 0.25 + value * 0.75,
+  const rotateZ = useTransform(radians, (rad) => Math.cos(rad) * 4);
+
+  const bezelColor = useTransform(depth, (value) =>
+    mixHex(FRONT_BEZEL_COLOR, FAR_BEZEL_COLOR, 1 - value),
   );
-  const glowOpacity = useTransform(depth, (value) => value * 0.35);
+  const screenColor = useTransform(depth, (value) =>
+    mixHex(FRONT_SCREEN_COLOR, FAR_SCREEN_COLOR, 1 - value),
+  );
+  const borderColor = useTransform(depth, (value) =>
+    mixHex(BEZEL_BORDER_COLOR, FAR_BEZEL_BORDER_COLOR, 1 - value),
+  );
+  const rimColor = useTransform(depth, (value) =>
+    mixHex(RIM_COLOR, FAR_RIM_COLOR, 1 - value),
+  );
 
   return (
     <motion.div
-      className="absolute left-1/2 top-[58%] w-[100px] md:w-[190px]"
+      className="absolute left-0 top-0"
       style={{
         x,
         y,
-        scale,
-        rotateX: 6,
-        rotateY,
-        rotateZ,
         zIndex,
+        width: frameWidth,
         aspectRatio: "9 / 19.5",
         transformStyle: "preserve-3d",
-        transformOrigin: "center center",
       }}
       transformTemplate={(_, generated) => `translate(-50%, -50%) ${generated}`}
     >
-      <div
-        className="pointer-events-none absolute -inset-2 rounded-[32px] bg-black/80 blur-2xl"
-        style={{ transform: "translateZ(-16px)" }}
+      <motion.div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          scale,
+          borderRadius: 28,
+          boxShadow: "0 30px 60px rgba(0,0,0,0.6)",
+        }}
       />
 
       <motion.div
-        className="pointer-events-none absolute -inset-8 rounded-[40px] bg-sky-500/40 blur-3xl"
-        style={{ opacity: glowOpacity, transform: "translateZ(-18px)" }}
-      />
-
-      {SLAB_DEPTHS.map((slabDepth) => (
-        <div
-          key={slabDepth}
-          className="absolute inset-0 rounded-[26px]"
-          style={{
-            transform: `translateZ(-${slabDepth}px)`,
-            background:
-              "linear-gradient(160deg, #08102a 0%, #0b1634 100%)",
-          }}
-        />
-      ))}
-
-      <div
-        className="absolute inset-0 rounded-[26px] p-[9px]"
+        className="absolute inset-0"
         style={{
-          background: "linear-gradient(160deg, #16275a 0%, #0a1430 100%)",
-          border: "1px solid rgba(110, 160, 255, 0.3)",
+          scale,
+          rotateX: 6,
+          rotateY,
+          rotateZ,
+          transformStyle: "preserve-3d",
+          transformOrigin: "center center",
         }}
       >
-        <div className="pointer-events-none absolute left-[12px] top-[5px] h-px w-[42%] bg-gradient-to-r from-white/35 via-white/10 to-transparent" />
+        {SLAB_DEPTHS.map((slabDepth, slabIndex) => (
+          <SlabEdge
+            key={slabDepth}
+            depth={depth}
+            baseColor={SLAB_COLORS[slabIndex]}
+            slabDepth={slabDepth}
+          />
+        ))}
 
-        <div className="relative h-full w-full overflow-hidden rounded-[18px] bg-black">
-          {screen.image ? (
-            <Image
-              src={screen.image}
-              alt=""
-              fill
-              sizes="(max-width: 767px) 100px, 190px"
-              className="object-cover"
-            />
-          ) : (
-            <div
-              className="absolute inset-0"
-              style={{ backgroundImage: screen.gradient }}
-            />
-          )}
-
-          <div
-            className="absolute inset-0 opacity-20"
+        <motion.div
+          className="absolute inset-0 z-10"
+          style={{
+            boxSizing: "border-box",
+            borderRadius: 28,
+            backgroundColor: bezelColor,
+            borderWidth: 1,
+            borderStyle: "solid",
+            borderColor,
+            padding: 10,
+          }}
+        >
+          <motion.div
+            className="pointer-events-none absolute"
             style={{
-              backgroundImage:
-                "linear-gradient(rgba(255,255,255,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.45) 1px, transparent 1px)",
-              backgroundSize: "18px 18px",
+              inset: 1,
+              borderRadius: 27,
+              borderTopWidth: 1,
+              borderRightWidth: 0,
+              borderBottomWidth: 0,
+              borderLeftWidth: 1,
+              borderStyle: "solid",
+              borderColor: rimColor,
             }}
           />
 
           <motion.div
-            className="absolute inset-0 bg-[#02040a]"
-            style={{ opacity: overlayOpacity }}
-          />
-
-          <motion.div
-            className="absolute inset-0"
-            style={{ opacity: contentOpacity }}
+            className="relative h-full w-full overflow-hidden"
+            style={{
+              borderRadius: 20,
+              backgroundColor: screenColor,
+            }}
           >
-            <div className="flex h-full flex-col items-center justify-center px-3 text-center">
-              <p className="text-[11px] font-extrabold uppercase leading-tight tracking-[0.08em] text-white md:text-xl">
-                Your Ad Here
-              </p>
-            </div>
-
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center px-3 pb-3 md:pb-4">
-              <span className="text-[5px] font-semibold uppercase tracking-[0.2em] text-white/70 md:text-[7px]">
-                Crystagrid
-              </span>
-            </div>
-
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0.04)_28%,transparent_58%)]" />
+            {screen.image ? (
+              <Image
+                src={screen.image}
+                alt=""
+                fill
+                sizes="(max-width: 767px) 100px, 190px"
+                className="object-cover"
+              />
+            ) : null}
           </motion.div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -185,15 +258,19 @@ function OrbitFrame({
 export default function OrbitScreens() {
   const containerRef = useRef<HTMLDivElement>(null);
   const angle = useMotionValue(INITIAL_ANGLE);
+  const centerX = useMotionValue(0);
+  const centerY = useMotionValue(0);
   const radiusX = useMotionValue(0);
   const radiusY = useMotionValue(0);
+  const frameWidth = useMotionValue(BASE_WIDTH);
   const prefersReducedMotion = useReducedMotion();
   const reducedMotionRef = useRef(false);
 
   useEffect(() => {
-    reducedMotionRef.current = prefersReducedMotion === true;
+    const isReduced = prefersReducedMotion === true;
+    reducedMotionRef.current = isReduced;
 
-    if (prefersReducedMotion) {
+    if (isReduced || ROTATE_SECONDS <= 0) {
       angle.set(INITIAL_ANGLE);
     }
   }, [angle, prefersReducedMotion]);
@@ -205,15 +282,18 @@ export default function OrbitScreens() {
       return;
     }
 
-    const updateRadius = (width: number, height: number) => {
-      const isMobile = width < 768;
+    const updateOrbit = (width: number, height: number) => {
+      const isMobile = width < MOBILE_BREAKPOINT;
 
+      centerX.set(width * 0.5);
+      centerY.set(height * CENTER_Y_RATIO);
       radiusX.set(
-        isMobile ? width * 0.4 : Math.min(width * 0.33, 640),
+        isMobile ? width * MOBILE_RX_RATIO : Math.min(width * RX_RATIO, MAX_RX),
       );
       radiusY.set(
-        isMobile ? height * 0.18 : Math.min(height * 0.3, 300),
+        isMobile ? height * MOBILE_RY_RATIO : Math.min(height * RY_RATIO, MAX_RY),
       );
+      frameWidth.set(isMobile ? MOBILE_BASE_WIDTH : BASE_WIDTH);
     };
 
     const observer = new ResizeObserver((entries) => {
@@ -223,31 +303,33 @@ export default function OrbitScreens() {
         return;
       }
 
-      updateRadius(entry.contentRect.width, entry.contentRect.height);
+      updateOrbit(entry.contentRect.width, entry.contentRect.height);
     });
 
     observer.observe(container);
 
     const rect = container.getBoundingClientRect();
-    updateRadius(rect.width, rect.height);
+    updateOrbit(rect.width, rect.height);
 
     return () => observer.disconnect();
-  }, [radiusX, radiusY]);
+  }, [centerX, centerY, frameWidth, radiusX, radiusY]);
 
   useAnimationFrame((_, delta) => {
-    if (reducedMotionRef.current) {
+    if (ROTATE_SECONDS <= 0 || reducedMotionRef.current) {
       return;
     }
 
-    angle.set((angle.get() + (delta / ROTATION_MS) * 360) % 360);
+    angle.set(
+      (angle.get() + (delta / (ROTATE_SECONDS * 1000)) * 360) % 360,
+    );
   });
 
   return (
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 overflow-hidden"
-      style={{ perspective: "1400px" }}
+      className="pointer-events-none absolute inset-0 z-[5] overflow-hidden"
+      style={{ perspective: `${PERSPECTIVE}px` }}
     >
       <div
         className="relative h-full w-full"
@@ -259,8 +341,11 @@ export default function OrbitScreens() {
             screen={screen}
             index={index}
             angle={angle}
+            centerX={centerX}
+            centerY={centerY}
             radiusX={radiusX}
             radiusY={radiusY}
+            frameWidth={frameWidth}
           />
         ))}
       </div>

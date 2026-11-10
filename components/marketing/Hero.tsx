@@ -6,7 +6,7 @@ export default function Hero() {
     <section className="relative isolate flex min-h-[100svh] w-full items-center justify-center overflow-hidden bg-[#05060a] px-6 py-24">
       <video
         className="absolute inset-0 h-full w-full object-cover"
-        src="/herovideo.webm"
+        src="/hero_video.webm"
         autoPlay
         loop
         muted

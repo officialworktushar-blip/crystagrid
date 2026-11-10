@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const AUTH_ROUTES = ["/login", "/register"];
+const AUTH_ROUTES = new Set(["/login", "/register"]);
 
 function redirectTo(
   request: NextRequest,
@@ -54,7 +54,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isDashboardRoute =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+  const isAuthRoute = AUTH_ROUTES.has(pathname);
 
   if (!user && isDashboardRoute) {
     return redirectTo(request, supabaseResponse, "/login");

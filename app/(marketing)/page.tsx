@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Hero from "@/components/marketing/Hero";
+import StatsRow from "@/components/marketing/StatsRow";
 
 export const metadata: Metadata = {
   title: "Crystagrid — Control every screen from one dashboard",
@@ -96,6 +97,7 @@ export default function MarketingPage() {
   return (
     <>
       <Hero />
+      <StatsRow />
 
       <section
         id="features"

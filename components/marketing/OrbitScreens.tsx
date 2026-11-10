@@ -33,8 +33,9 @@ const MAX_RY = 300;
 const CENTER_Y_RATIO = 0.58;
 const ROTATE_SECONDS = 60;
 const BASE_WIDTH = 200;
-const FRAME_ASPECT_RATIO = "1 / 1.713";
-const FRAME_HEIGHT_RATIO = 1.713;
+const BEZEL = 10;
+const SCREEN_ASPECT = 1;
+const EXTRA_BOTTOM_BEZEL = 0;
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_RX_RATIO = 0.40;
@@ -55,13 +56,9 @@ const SLAB_COLORS = [
 
 const FRONT_BEZEL_COLOR = "#0f1d42";
 const FAR_BEZEL_COLOR = "#0a1330";
-const FRONT_SCREEN_COLOR = "#060b18";
-const FAR_SCREEN_COLOR = "#04070f";
 const FAR_SLAB_COLOR = "#04070f";
-const BEZEL_BORDER_COLOR = "#2a4a8f";
-const FAR_BEZEL_BORDER_COLOR = "#15264d";
-const RIM_COLOR = "#3a5fae";
-const FAR_RIM_COLOR = "#1a2d5b";
+const BEZEL_BORDER_COLOR = "#1a2d63";
+const SCREEN_COLOR = "#060b18";
 
 const SCREENS: ScreenCreative[] = [{}, {}, {}, {}, {}, {}, {}];
 
@@ -155,7 +152,7 @@ function SlabEdge({
         width: frameWidth,
         height: frameHeight,
         transform: `translateZ(-${slabDepth}px)`,
-        borderRadius: 28,
+        borderRadius: 24,
         backgroundColor,
         backfaceVisibility: "hidden",
       }}
@@ -173,6 +170,8 @@ type OrbitFrameProps = {
   radiusY: number;
   frameWidth: number;
   frameHeight: number;
+  innerScreenWidth: number;
+  innerScreenHeight: number;
 };
 
 function OrbitFrame({
@@ -185,6 +184,8 @@ function OrbitFrame({
   radiusY,
   frameWidth,
   frameHeight,
+  innerScreenWidth,
+  innerScreenHeight,
 }: OrbitFrameProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -214,15 +215,6 @@ function OrbitFrame({
 
   const bezelColor = useTransform(depth, (value) =>
     mixHex(FRONT_BEZEL_COLOR, FAR_BEZEL_COLOR, 1 - value),
-  );
-  const screenColor = useTransform(depth, (value) =>
-    mixHex(FRONT_SCREEN_COLOR, FAR_SCREEN_COLOR, 1 - value),
-  );
-  const borderColor = useTransform(depth, (value) =>
-    mixHex(BEZEL_BORDER_COLOR, FAR_BEZEL_BORDER_COLOR, 1 - value),
-  );
-  const rimColor = useTransform(depth, (value) =>
-    mixHex(RIM_COLOR, FAR_RIM_COLOR, 1 - value),
   );
 
   useAnimationFrame(() => {
@@ -255,26 +247,11 @@ function OrbitFrame({
       style={{
         width: frameWidth,
         height: frameHeight,
-        aspectRatio: FRAME_ASPECT_RATIO,
         transform: initialPositionTransform,
         zIndex: initialZIndex,
         isolation: "isolate",
-        ...(DEBUG
-          ? { outline: "2px solid lime", outlineOffset: "0px" }
-          : {}),
       }}
     >
-      <div
-        aria-hidden="true"
-        className="absolute left-0 top-0"
-        style={{
-          width: frameWidth,
-          height: frameHeight,
-          borderRadius: 28,
-          boxShadow: "0 30px 60px #000000",
-        }}
-      />
-
       <motion.div
         ref={innerRef}
         className="absolute left-0 top-0"
@@ -303,55 +280,38 @@ function OrbitFrame({
             width: frameWidth,
             height: frameHeight,
             boxSizing: "border-box",
-            borderRadius: 28,
+            borderRadius: 24,
             backgroundColor: bezelColor,
             borderWidth: 1,
             borderStyle: "solid",
-            borderColor,
-            padding: 10,
+            borderColor: BEZEL_BORDER_COLOR,
             backfaceVisibility: "hidden",
           }}
         >
-          <motion.div
-            className="pointer-events-none absolute"
-            style={{
-              inset: 1,
-              borderRadius: 27,
-              borderTopWidth: 1,
-              borderRightWidth: 0,
-              borderBottomWidth: 0,
-              borderLeftWidth: 1,
-              borderStyle: "solid",
-              borderColor: rimColor,
-            }}
-          />
-
           <div
-            className="relative h-full w-full overflow-hidden"
-            style={{ borderRadius: 20 }}
+            className="absolute overflow-hidden"
+            style={{
+              left: BEZEL - 1,
+              top: BEZEL - 1,
+              width: innerScreenWidth,
+              height: innerScreenHeight,
+              borderRadius: 16,
+              backgroundColor: SCREEN_COLOR,
+            }}
           >
-            <div
-              className="absolute inset-0"
-              style={{
-                borderRadius: 20,
-                backgroundColor: "#060b18",
-              }}
-            />
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                borderRadius: 20,
-                backgroundColor: screenColor,
-              }}
-            />
             {screen.image ? (
               <Image
                 src={screen.image}
                 alt=""
                 fill
-                sizes="(max-width: 767px) 105px, 200px"
-                className="object-cover"
-                style={{ opacity: 1 }}
+                sizes={`${innerScreenWidth}px`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                  opacity: 1,
+                }}
               />
             ) : null}
           </div>
@@ -452,7 +412,10 @@ export default function OrbitScreens() {
     isMobile ? MOBILE_BASE_WIDTH : BASE_WIDTH,
     MIN_FRAME_WIDTH,
   );
-  const frameHeight = frameWidth * FRAME_HEIGHT_RATIO;
+  const innerScreenWidth = frameWidth - 2 * BEZEL;
+  const innerScreenHeight = innerScreenWidth / SCREEN_ASPECT;
+  const frameHeight =
+    innerScreenHeight + 2 * BEZEL + EXTRA_BOTTOM_BEZEL;
 
   return (
     <div
@@ -480,6 +443,8 @@ export default function OrbitScreens() {
               radiusY={radiusY}
               frameWidth={frameWidth}
               frameHeight={frameHeight}
+              innerScreenWidth={innerScreenWidth}
+              innerScreenHeight={innerScreenHeight}
             />
           ))
         ) : null}

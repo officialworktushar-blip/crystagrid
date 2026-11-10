@@ -32,12 +32,14 @@ const MAX_RX = 640;
 const MAX_RY = 300;
 const CENTER_Y_RATIO = 0.58;
 const ROTATE_SECONDS = 60;
-const BASE_WIDTH = 190;
+const BASE_WIDTH = 200;
+const FRAME_ASPECT_RATIO = "1 / 1.713";
+const FRAME_HEIGHT_RATIO = 1.713;
 
 const MOBILE_BREAKPOINT = 768;
 const MOBILE_RX_RATIO = 0.40;
 const MOBILE_RY_RATIO = 0.18;
-const MOBILE_BASE_WIDTH = 100;
+const MOBILE_BASE_WIDTH = 105;
 const MIN_FRAME_WIDTH = 90;
 
 const PERSPECTIVE = 1400;
@@ -79,19 +81,28 @@ function mixHex(from: string, to: string, amount: number): string {
   const toRgb = hexToRgb(to);
 
   const channel = (index: number) =>
-    Math.round(fromRgb[index] + (toRgb[index] - fromRgb[index]) * clamped);
+    Math.round(fromRgb[index] + (toRgb[index] - fromRgb[index]) * clamped)
+      .toString(16)
+      .padStart(2, "0");
 
-  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+  return `#${channel(0)}${channel(1)}${channel(2)}`;
 }
 
-function getFrameMotion(
+function getFrameState(
   baseAngle: number,
   index: number,
   centerX: number,
   centerY: number,
   radiusX: number,
   radiusY: number,
-): { transform: string; zIndex: number } {
+): {
+  x: number;
+  y: number;
+  radians: number;
+  scale: number;
+  rotateY: number;
+  rotateZ: number;
+} {
   const frameAngle = baseAngle + index * ANGLE_STEP;
   const radians = (frameAngle * Math.PI) / 180;
   const x = centerX + Math.cos(radians) * radiusX;
@@ -102,20 +113,36 @@ function getFrameMotion(
     -Math.cos(radians) * (30 + 45 * (1 - Math.abs(Math.sin(radians))));
   const rotateZ = Math.cos(radians) * 4;
 
-  return {
-    transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) rotateX(6deg) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg) scale(${scale})`,
-    zIndex: Math.round(depth * 10),
-  };
+  return { x, y, radians, scale, rotateY, rotateZ };
+}
+
+function getPositionTransform(state: {
+  x: number;
+  y: number;
+  scale: number;
+}): string {
+  return `translate3d(${state.x}px, ${state.y}px, 0) translate(-50%, -50%) scale(${state.scale})`;
+}
+
+function getVisualTransform(state: {
+  rotateY: number;
+  rotateZ: number;
+}): string {
+  return `rotateX(6deg) rotateY(${state.rotateY}deg) rotateZ(${state.rotateZ}deg)`;
 }
 
 function SlabEdge({
   depth,
   baseColor,
   slabDepth,
+  frameWidth,
+  frameHeight,
 }: {
   depth: MotionValue<number>;
   baseColor: string;
   slabDepth: number;
+  frameWidth: number;
+  frameHeight: number;
 }) {
   const backgroundColor = useTransform(depth, (value) =>
     mixHex(baseColor, FAR_SLAB_COLOR, 1 - value),
@@ -123,11 +150,14 @@ function SlabEdge({
 
   return (
     <motion.div
-      className="absolute inset-0"
+      className="absolute left-0 top-0"
       style={{
+        width: frameWidth,
+        height: frameHeight,
         transform: `translateZ(-${slabDepth}px)`,
         borderRadius: 28,
         backgroundColor,
+        backfaceVisibility: "hidden",
       }}
     />
   );
@@ -142,6 +172,7 @@ type OrbitFrameProps = {
   radiusX: number;
   radiusY: number;
   frameWidth: number;
+  frameHeight: number;
 };
 
 function OrbitFrame({
@@ -153,8 +184,12 @@ function OrbitFrame({
   radiusX,
   radiusY,
   frameWidth,
+  frameHeight,
 }: OrbitFrameProps) {
-  const initialMotion = getFrameMotion(
+  const frameRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+
+  const initialState = getFrameState(
     angle.get(),
     index,
     centerX,
@@ -162,8 +197,10 @@ function OrbitFrame({
     radiusX,
     radiusY,
   );
-  const transform = useMotionValue(initialMotion.transform);
-  const zIndex = useMotionValue(initialMotion.zIndex);
+  const initialDepth = (Math.sin(initialState.radians) + 1) / 2;
+  const initialPositionTransform = getPositionTransform(initialState);
+  const initialVisualTransform = getVisualTransform(initialState);
+  const initialZIndex = String(Math.round(initialDepth * 100));
 
   const frameAngle = useTransform(
     angle,
@@ -188,36 +225,40 @@ function OrbitFrame({
     mixHex(RIM_COLOR, FAR_RIM_COLOR, 1 - value),
   );
 
-  useLayoutEffect(() => {
-    const update = (value: number) => {
-      const next = getFrameMotion(
-        value,
-        index,
-        centerX,
-        centerY,
-        radiusX,
-        radiusY,
-      );
+  useAnimationFrame(() => {
+    const frame = frameRef.current;
+    const inner = innerRef.current;
 
-      transform.set(next.transform);
-      zIndex.set(next.zIndex);
-    };
+    if (!frame || !inner) {
+      return;
+    }
 
-    update(angle.get());
+    const state = getFrameState(
+      angle.get(),
+      index,
+      centerX,
+      centerY,
+      radiusX,
+      radiusY,
+    );
+    const currentDepth = (Math.sin(state.radians) + 1) / 2;
 
-    return angle.on("change", update);
-  }, [angle, centerX, centerY, index, radiusX, radiusY, transform, zIndex]);
+    frame.style.transform = getPositionTransform(state);
+    frame.style.zIndex = String(Math.round(currentDepth * 100));
+    inner.style.transform = getVisualTransform(state);
+  });
 
   return (
     <motion.div
+      ref={frameRef}
       className="absolute left-0 top-0"
       style={{
         width: frameWidth,
-        aspectRatio: "9 / 19.5",
-        transform,
-        zIndex,
-        transformOrigin: "center center",
-        transformStyle: "preserve-3d",
+        height: frameHeight,
+        aspectRatio: FRAME_ASPECT_RATIO,
+        transform: initialPositionTransform,
+        zIndex: initialZIndex,
+        isolation: "isolate",
         ...(DEBUG
           ? { outline: "2px solid lime", outlineOffset: "0px" }
           : {}),
@@ -225,18 +266,24 @@ function OrbitFrame({
     >
       <div
         aria-hidden="true"
-        className="absolute inset-0"
+        className="absolute left-0 top-0"
         style={{
+          width: frameWidth,
+          height: frameHeight,
           borderRadius: 28,
-          boxShadow: "0 30px 60px rgba(0,0,0,0.6)",
+          boxShadow: "0 30px 60px #000000",
         }}
       />
 
       <motion.div
-        className="absolute inset-0"
+        ref={innerRef}
+        className="absolute left-0 top-0"
         style={{
-          transformStyle: "preserve-3d",
+          width: frameWidth,
+          height: frameHeight,
+          transform: initialVisualTransform,
           transformOrigin: "center center",
+          transformStyle: "preserve-3d",
         }}
       >
         {SLAB_DEPTHS.map((slabDepth, slabIndex) => (
@@ -245,12 +292,16 @@ function OrbitFrame({
             depth={depth}
             baseColor={SLAB_COLORS[slabIndex]}
             slabDepth={slabDepth}
+            frameWidth={frameWidth}
+            frameHeight={frameHeight}
           />
         ))}
 
         <motion.div
-          className="absolute inset-0 z-10"
+          className="absolute left-0 top-0 z-10"
           style={{
+            width: frameWidth,
+            height: frameHeight,
             boxSizing: "border-box",
             borderRadius: 28,
             backgroundColor: bezelColor,
@@ -258,6 +309,7 @@ function OrbitFrame({
             borderStyle: "solid",
             borderColor,
             padding: 10,
+            backfaceVisibility: "hidden",
           }}
         >
           <motion.div
@@ -274,23 +326,35 @@ function OrbitFrame({
             }}
           />
 
-          <motion.div
+          <div
             className="relative h-full w-full overflow-hidden"
-            style={{
-              borderRadius: 20,
-              backgroundColor: screenColor,
-            }}
+            style={{ borderRadius: 20 }}
           >
+            <div
+              className="absolute inset-0"
+              style={{
+                borderRadius: 20,
+                backgroundColor: "#060b18",
+              }}
+            />
+            <motion.div
+              className="absolute inset-0"
+              style={{
+                borderRadius: 20,
+                backgroundColor: screenColor,
+              }}
+            />
             {screen.image ? (
               <Image
                 src={screen.image}
                 alt=""
                 fill
-                sizes="(max-width: 767px) 100px, 190px"
+                sizes="(max-width: 767px) 105px, 200px"
                 className="object-cover"
+                style={{ opacity: 1 }}
               />
             ) : null}
-          </motion.div>
+          </div>
         </motion.div>
       </motion.div>
     </motion.div>
@@ -388,6 +452,7 @@ export default function OrbitScreens() {
     isMobile ? MOBILE_BASE_WIDTH : BASE_WIDTH,
     MIN_FRAME_WIDTH,
   );
+  const frameHeight = frameWidth * FRAME_HEIGHT_RATIO;
 
   return (
     <div
@@ -401,10 +466,7 @@ export default function OrbitScreens() {
           : {}),
       }}
     >
-      <div
-        className="relative h-full w-full"
-        style={{ transformStyle: "preserve-3d" }}
-      >
+      <div className="relative h-full w-full">
         {viewport ? (
           SCREENS.map((screen, index) => (
             <OrbitFrame
@@ -417,6 +479,7 @@ export default function OrbitScreens() {
               radiusX={radiusX}
               radiusY={radiusY}
               frameWidth={frameWidth}
+              frameHeight={frameHeight}
             />
           ))
         ) : null}

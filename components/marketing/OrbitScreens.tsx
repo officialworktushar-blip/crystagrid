@@ -9,10 +9,17 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+const DEBUG = false;
 
 type ScreenCreative = {
   image?: string;
+};
+
+type ViewportSize = {
+  width: number;
+  height: number;
 };
 
 const FRAME_COUNT = 7;
@@ -31,6 +38,7 @@ const MOBILE_BREAKPOINT = 768;
 const MOBILE_RX_RATIO = 0.40;
 const MOBILE_RY_RATIO = 0.18;
 const MOBILE_BASE_WIDTH = 100;
+const MIN_FRAME_WIDTH = 90;
 
 const PERSPECTIVE = 1400;
 const SLAB_DEPTHS = [3, 6, 9, 12, 15, 18] as const;
@@ -76,6 +84,30 @@ function mixHex(from: string, to: string, amount: number): string {
   return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
+function getFrameMotion(
+  baseAngle: number,
+  index: number,
+  centerX: number,
+  centerY: number,
+  radiusX: number,
+  radiusY: number,
+): { transform: string; zIndex: number } {
+  const frameAngle = baseAngle + index * ANGLE_STEP;
+  const radians = (frameAngle * Math.PI) / 180;
+  const x = centerX + Math.cos(radians) * radiusX;
+  const y = centerY + Math.sin(radians) * radiusY;
+  const depth = (Math.sin(radians) + 1) / 2;
+  const scale = 0.8 + depth * 0.45;
+  const rotateY =
+    -Math.cos(radians) * (30 + 45 * (1 - Math.abs(Math.sin(radians))));
+  const rotateZ = Math.cos(radians) * 4;
+
+  return {
+    transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) rotateX(6deg) rotateY(${rotateY}deg) rotateZ(${rotateZ}deg) scale(${scale})`,
+    zIndex: Math.round(depth * 10),
+  };
+}
+
 function SlabEdge({
   depth,
   baseColor,
@@ -105,11 +137,11 @@ type OrbitFrameProps = {
   screen: ScreenCreative;
   index: number;
   angle: MotionValue<number>;
-  centerX: MotionValue<number>;
-  centerY: MotionValue<number>;
-  radiusX: MotionValue<number>;
-  radiusY: MotionValue<number>;
-  frameWidth: MotionValue<number>;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  frameWidth: number;
 };
 
 function OrbitFrame({
@@ -122,6 +154,17 @@ function OrbitFrame({
   radiusY,
   frameWidth,
 }: OrbitFrameProps) {
+  const initialMotion = getFrameMotion(
+    angle.get(),
+    index,
+    centerX,
+    centerY,
+    radiusX,
+    radiusY,
+  );
+  const transform = useMotionValue(initialMotion.transform);
+  const zIndex = useMotionValue(initialMotion.zIndex);
+
   const frameAngle = useTransform(
     angle,
     (value) => value + index * ANGLE_STEP,
@@ -130,25 +173,7 @@ function OrbitFrame({
     frameAngle,
     (value) => (value * Math.PI) / 180,
   );
-
-  const x = useTransform<number, number>(
-    [radians, radiusX, centerX],
-    ([rad, rx, cx]) => cx + Math.cos(rad) * rx,
-  );
-  const y = useTransform<number, number>(
-    [radians, radiusY, centerY],
-    ([rad, ry, cy]) => cy + Math.sin(rad) * ry,
-  );
-
   const depth = useTransform(radians, (rad) => (Math.sin(rad) + 1) / 2);
-  const scale = useTransform(depth, (value) => 0.8 + value * 0.45);
-  const zIndex = useTransform(depth, (value) => Math.round(value * 10));
-  const rotateY = useTransform(
-    radians,
-    (rad) =>
-      -Math.cos(rad) * (30 + 45 * (1 - Math.abs(Math.sin(rad)))),
-  );
-  const rotateZ = useTransform(radians, (rad) => Math.cos(rad) * 4);
 
   const bezelColor = useTransform(depth, (value) =>
     mixHex(FRONT_BEZEL_COLOR, FAR_BEZEL_COLOR, 1 - value),
@@ -163,24 +188,45 @@ function OrbitFrame({
     mixHex(RIM_COLOR, FAR_RIM_COLOR, 1 - value),
   );
 
+  useLayoutEffect(() => {
+    const update = (value: number) => {
+      const next = getFrameMotion(
+        value,
+        index,
+        centerX,
+        centerY,
+        radiusX,
+        radiusY,
+      );
+
+      transform.set(next.transform);
+      zIndex.set(next.zIndex);
+    };
+
+    update(angle.get());
+
+    return angle.on("change", update);
+  }, [angle, centerX, centerY, index, radiusX, radiusY, transform, zIndex]);
+
   return (
     <motion.div
       className="absolute left-0 top-0"
       style={{
-        x,
-        y,
-        zIndex,
         width: frameWidth,
         aspectRatio: "9 / 19.5",
+        transform,
+        zIndex,
+        transformOrigin: "center center",
         transformStyle: "preserve-3d",
+        ...(DEBUG
+          ? { outline: "2px solid lime", outlineOffset: "0px" }
+          : {}),
       }}
-      transformTemplate={(_, generated) => `translate(-50%, -50%) ${generated}`}
     >
-      <motion.div
+      <div
         aria-hidden="true"
         className="absolute inset-0"
         style={{
-          scale,
           borderRadius: 28,
           boxShadow: "0 30px 60px rgba(0,0,0,0.6)",
         }}
@@ -189,10 +235,6 @@ function OrbitFrame({
       <motion.div
         className="absolute inset-0"
         style={{
-          scale,
-          rotateX: 6,
-          rotateY,
-          rotateZ,
           transformStyle: "preserve-3d",
           transformOrigin: "center center",
         }}
@@ -257,12 +299,8 @@ function OrbitFrame({
 
 export default function OrbitScreens() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState<ViewportSize | null>(null);
   const angle = useMotionValue(INITIAL_ANGLE);
-  const centerX = useMotionValue(0);
-  const centerY = useMotionValue(0);
-  const radiusX = useMotionValue(0);
-  const radiusY = useMotionValue(0);
-  const frameWidth = useMotionValue(BASE_WIDTH);
   const prefersReducedMotion = useReducedMotion();
   const reducedMotionRef = useRef(false);
 
@@ -275,44 +313,51 @@ export default function OrbitScreens() {
     }
   }, [angle, prefersReducedMotion]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
 
     if (!container) {
       return;
     }
 
-    const updateOrbit = (width: number, height: number) => {
-      const isMobile = width < MOBILE_BREAKPOINT;
+    const applySize = (width: number, height: number) => {
+      const nextWidth = width > 0 ? width : window.innerWidth;
+      const nextHeight = height > 0 ? height : window.innerHeight;
 
-      centerX.set(width * 0.5);
-      centerY.set(height * CENTER_Y_RATIO);
-      radiusX.set(
-        isMobile ? width * MOBILE_RX_RATIO : Math.min(width * RX_RATIO, MAX_RX),
+      if (nextWidth <= 0 || nextHeight <= 0) {
+        return;
+      }
+
+      setViewport((current) =>
+        current?.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight },
       );
-      radiusY.set(
-        isMobile ? height * MOBILE_RY_RATIO : Math.min(height * RY_RATIO, MAX_RY),
-      );
-      frameWidth.set(isMobile ? MOBILE_BASE_WIDTH : BASE_WIDTH);
     };
+
+    const measure = () => {
+      const rect = container.getBoundingClientRect();
+      applySize(rect.width, rect.height);
+    };
+
+    measure();
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
 
-      if (!entry) {
-        return;
+      if (entry) {
+        applySize(entry.contentRect.width, entry.contentRect.height);
       }
-
-      updateOrbit(entry.contentRect.width, entry.contentRect.height);
     });
 
     observer.observe(container);
+    window.addEventListener("resize", measure);
 
-    const rect = container.getBoundingClientRect();
-    updateOrbit(rect.width, rect.height);
-
-    return () => observer.disconnect();
-  }, [centerX, centerY, frameWidth, radiusX, radiusY]);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   useAnimationFrame((_, delta) => {
     if (ROTATE_SECONDS <= 0 || reducedMotionRef.current) {
@@ -324,30 +369,57 @@ export default function OrbitScreens() {
     );
   });
 
+  const isMobile = viewport
+    ? viewport.width < MOBILE_BREAKPOINT
+    : false;
+  const centerX = viewport ? viewport.width * 0.5 : 0;
+  const centerY = viewport ? viewport.height * CENTER_Y_RATIO : 0;
+  const radiusX = viewport
+    ? isMobile
+      ? viewport.width * MOBILE_RX_RATIO
+      : Math.min(viewport.width * RX_RATIO, MAX_RX)
+    : 0;
+  const radiusY = viewport
+    ? isMobile
+      ? viewport.height * MOBILE_RY_RATIO
+      : Math.min(viewport.height * RY_RATIO, MAX_RY)
+    : 0;
+  const frameWidth = Math.max(
+    isMobile ? MOBILE_BASE_WIDTH : BASE_WIDTH,
+    MIN_FRAME_WIDTH,
+  );
+
   return (
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-[5] overflow-hidden"
-      style={{ perspective: `${PERSPECTIVE}px` }}
+      className="absolute inset-0 z-[2] pointer-events-none overflow-hidden"
+      style={{
+        perspective: `${PERSPECTIVE}px`,
+        ...(DEBUG
+          ? { outline: "2px solid lime", outlineOffset: "-2px" }
+          : {}),
+      }}
     >
       <div
         className="relative h-full w-full"
         style={{ transformStyle: "preserve-3d" }}
       >
-        {SCREENS.map((screen, index) => (
-          <OrbitFrame
-            key={index}
-            screen={screen}
-            index={index}
-            angle={angle}
-            centerX={centerX}
-            centerY={centerY}
-            radiusX={radiusX}
-            radiusY={radiusY}
-            frameWidth={frameWidth}
-          />
-        ))}
+        {viewport ? (
+          SCREENS.map((screen, index) => (
+            <OrbitFrame
+              key={index}
+              screen={screen}
+              index={index}
+              angle={angle}
+              centerX={centerX}
+              centerY={centerY}
+              radiusX={radiusX}
+              radiusY={radiusY}
+              frameWidth={frameWidth}
+            />
+          ))
+        ) : null}
       </div>
     </div>
   );

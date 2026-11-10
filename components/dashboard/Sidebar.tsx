@@ -3,88 +3,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import {
+  ArrowLeft,
+  Images,
+  LayoutDashboard,
+  ListVideo,
+  Monitor,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  {
-    label: "Overview",
-    href: "/dashboard",
-    icon: (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.7}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-      >
-        <rect x="3" y="3" width="7" height="7" rx="1.5" />
-        <rect x="14" y="3" width="7" height="7" rx="1.5" />
-        <rect x="3" y="14" width="7" height="7" rx="1.5" />
-        <rect x="14" y="14" width="7" height="7" rx="1.5" />
-      </svg>
-    ),
-  },
-  {
-    label: "Screens",
-    href: "/dashboard/screens",
-    icon: (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.7}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-      >
-        <rect x="3" y="4" width="18" height="12" rx="2" />
-        <path d="M8 20h8M12 16v4" />
-      </svg>
-    ),
-  },
-  {
-    label: "Media",
-    href: "/dashboard/media",
-    icon: (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.7}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-      >
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <circle cx="8.5" cy="9" r="1.5" />
-        <path d="m21 15-4.5-4.5L9 18" />
-      </svg>
-    ),
-  },
-  {
-    label: "Playlists",
-    href: "/dashboard/playlists",
-    icon: (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.7}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-      >
-        <path d="M8 6h12M8 12h12M8 18h7" />
-        <path d="M4 6h.01M4 12h.01M4 18h.01" />
-      </svg>
-    ),
-  },
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+const navItems: NavItem[] = [
+  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Screens", href: "/dashboard/screens", icon: Monitor },
+  { label: "Media", href: "/dashboard/media", icon: Images },
+  { label: "Playlists", href: "/dashboard/playlists", icon: ListVideo },
 ];
 
 export default function Sidebar({
@@ -139,7 +79,7 @@ export default function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/5 bg-[#080b12] transition-transform duration-300 ease-out lg:w-64 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/5 bg-[#050b1f] transition-transform duration-300 ease-out lg:w-64 lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -147,9 +87,9 @@ export default function Sidebar({
           <Link
             href="/dashboard"
             onClick={onClose}
-            className="flex items-center gap-2.5 text-base font-semibold tracking-tight text-white"
+            className="flex items-center gap-2.5 text-base font-bold tracking-tight text-white"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/20">
+            <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg shadow-brand">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
@@ -166,19 +106,9 @@ export default function Sidebar({
             type="button"
             onClick={onClose}
             aria-label="Close sidebar"
-            className="rounded-lg p-1.5 text-white/50 transition hover:bg-white/5 hover:text-white lg:hidden"
+            className="rounded-full p-1.5 text-white/50 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 lg:hidden"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              className="h-5 w-5"
-            >
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -187,7 +117,9 @@ export default function Sidebar({
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
+                : pathname === item.href ||
+                  pathname.startsWith(`${item.href}/`);
+            const Icon = item.icon;
 
             return (
               <Link
@@ -196,22 +128,21 @@ export default function Sidebar({
                 onClick={onClose}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                  "group flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
                   isActive
-                    ? "bg-gradient-to-r from-cyan-500/15 to-blue-600/10 text-cyan-300 ring-1 ring-inset ring-cyan-400/20"
-                    : "text-white/55 hover:bg-white/[0.04] hover:text-white",
+                    ? "brand-gradient text-white shadow-brand"
+                    : "text-white/55 hover:bg-white/[0.05] hover:text-white",
                 )}
               >
-                <span
+                <Icon
+                  aria-hidden="true"
                   className={cn(
-                    "transition",
+                    "h-5 w-5 transition duration-200",
                     isActive
-                      ? "text-cyan-300"
+                      ? "text-white"
                       : "text-white/40 group-hover:text-white/80",
                   )}
-                >
-                  {item.icon}
-                </span>
+                />
                 {item.label}
               </Link>
             );
@@ -221,22 +152,9 @@ export default function Sidebar({
         <div className="border-t border-white/5 px-3 py-4">
           <Link
             href="/"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/40 transition hover:bg-white/[0.04] hover:text-white"
+            className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-white/40 transition duration-200 hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.7}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-5 w-5"
-            >
-              <path d="M3 10.5 12 3l9 7.5" />
-              <path d="M5 9.5V21h14V9.5" />
-              <path d="M9 21v-6h6v6" />
-            </svg>
+            <ArrowLeft className="h-5 w-5" />
             Back to site
           </Link>
         </div>

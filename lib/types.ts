@@ -32,17 +32,16 @@ export interface PairingCode {
   created_at: string;
 }
 
+export type MediaType = "image" | "video";
+
 export interface Media {
   id: string;
   customer_id: string;
-  name?: string | null;
-  file_name?: string | null;
-  file_path?: string | null;
-  file_url?: string | null;
-  file_type?: string | null;
-  mime_type?: string | null;
-  size_bytes?: number | null;
-  duration_seconds?: number | null;
+  name: string;
+  type: MediaType;
+  file_path: string;
+  file_size: number;
+  duration: number | null;
   created_at: string;
 }
 
@@ -78,7 +77,8 @@ export interface DashboardStats {
   playlists: number;
 }
 
-export interface GeneratePairingCodeResult {
+export interface PairingResult {
   code: string;
-  expires_at?: string;
+  screen_id: string;
+  expires_at: string;
 }

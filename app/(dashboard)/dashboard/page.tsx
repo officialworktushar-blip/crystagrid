@@ -1,37 +1,42 @@
-import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDashboardStats } from "@/lib/dashboard/queries";
+import {
+  ArrowRight,
+  Images,
+  ListVideo,
+  Monitor,
+  Wifi,
+  type LucideIcon,
+} from "lucide-react";
+import Card from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
-function StatCard({
-  label,
-  value,
-  icon,
-  accent,
-}: {
+type StatCardProps = {
   label: string;
   value: number;
-  icon: ReactNode;
+  icon: LucideIcon;
   accent: string;
-}) {
+};
+
+function StatCard({ label, value, icon: Icon, accent }: StatCardProps) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition hover:border-white/20 hover:bg-white/[0.04]">
+    <Card className="p-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-white/50">{label}</p>
+        <p className="text-sm text-body">{label}</p>
         <span
           className={cn(
             "flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]",
             accent,
           )}
         >
-          {icon}
+          <Icon aria-hidden="true" className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-tight text-white tabular-nums">
+      <p className="mt-4 text-3xl font-extrabold tracking-tight text-white tabular-nums">
         {value}
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -45,104 +50,84 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const stats = await getDashboardStats(supabase, user.id);
+  const [screensResult, onlineResult, mediaResult, playlistsResult] =
+    await Promise.all([
+      supabase
+        .from("screens")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", user.id),
+      supabase
+        .from("screens")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", user.id)
+        .eq("status", "online"),
+      supabase
+        .from("media")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", user.id),
+      supabase
+        .from("playlists")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", user.id),
+    ]);
+
+  const screensCount = screensResult.count ?? 0;
+  const hasError = [
+    screensResult.error,
+    onlineResult.error,
+    mediaResult.error,
+    playlistsResult.error,
+  ].some(Boolean);
 
   const cards = [
     {
-      label: "Total Screens",
-      value: stats.totalScreens,
-      accent: "text-cyan-300",
-      icon: (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
-          <rect x="3" y="4" width="18" height="12" rx="2" />
-          <path d="M8 20h8M12 16v4" />
-        </svg>
-      ),
+      label: "Screens",
+      value: screensCount,
+      accent: "text-brand-sky",
+      icon: Monitor,
     },
     {
       label: "Online",
-      value: stats.onlineScreens,
+      value: onlineResult.count ?? 0,
       accent: "text-emerald-300",
-      icon: (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
-          <path d="M3 12h4l2.5-6 4 12L16 12h5" />
-        </svg>
-      ),
+      icon: Wifi,
     },
     {
-      label: "Media Files",
-      value: stats.mediaFiles,
+      label: "Media files",
+      value: mediaResult.count ?? 0,
       accent: "text-blue-300",
-      icon: (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <circle cx="8.5" cy="9" r="1.5" />
-          <path d="m21 15-4.5-4.5L9 18" />
-        </svg>
-      ),
+      icon: Images,
     },
     {
       label: "Playlists",
-      value: stats.playlists,
+      value: playlistsResult.count ?? 0,
       accent: "text-violet-300",
-      icon: (
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
-          <path d="M8 6h12M8 12h12M8 18h7" />
-          <path d="M4 6h.01M4 12h.01M4 18h.01" />
-        </svg>
-      ),
+      icon: ListVideo,
     },
   ];
 
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sky">
           Overview
         </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
           Dashboard
         </h1>
-        <p className="mt-2 text-sm text-white/50">
+        <p className="mt-2 text-sm text-body">
           A quick look at your screens and content.
         </p>
       </div>
+
+      {hasError ? (
+        <p
+          role="alert"
+          className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+        >
+          Some dashboard totals could not be loaded. Refresh to try again.
+        </p>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
@@ -155,6 +140,36 @@ export default async function DashboardPage() {
           />
         ))}
       </div>
+
+      {screensCount === 0 ? (
+        <Link
+          href="/dashboard/screens"
+          className="group flex flex-col gap-5 rounded-3xl border border-white/10 bg-surface p-6 transition duration-200 hover:border-sky-500/40 hover:shadow-card sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-4">
+            <span className="brand-gradient flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-brand">
+              <Monitor aria-hidden="true" className="h-6 w-6" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-white">
+                Add your first screen
+              </h2>
+              <p className="mt-1 max-w-xl text-sm leading-6 text-body">
+                Pair a display with a 6-digit code and start publishing content
+                from your dashboard.
+              </p>
+            </div>
+          </div>
+
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-brand-sky transition duration-200 group-hover:text-white">
+            Go to screens
+            <ArrowRight
+              aria-hidden="true"
+              className="h-4 w-4 transition duration-200 group-hover:translate-x-0.5"
+            />
+          </span>
+        </Link>
+      ) : null}
     </div>
   );
 }

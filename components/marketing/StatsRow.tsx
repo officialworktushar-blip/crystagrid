@@ -13,7 +13,7 @@ export default function StatsRow() {
   return (
     <section
       aria-label="Platform highlights"
-      className="relative z-20 -mt-12 pb-6 sm:-mt-16 sm:pb-10"
+      className="py-24"
     >
       <Container>
         <Card className="grid grid-cols-2 overflow-hidden p-0 hover:border-white/10 hover:shadow-none sm:grid-cols-4">

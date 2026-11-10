@@ -4,7 +4,7 @@ import Button from "@/components/ui/Button";
 
 export default function Hero() {
   return (
-    <section className="relative isolate flex min-h-[100svh] w-full items-center justify-center overflow-hidden bg-background px-6 py-24">
+    <section className="relative isolate flex min-h-[100svh] w-full items-start justify-center overflow-hidden bg-background px-6 pb-24">
       <video
         className="absolute inset-0 h-full w-full object-cover"
         src="/hero_video.webm"
@@ -19,33 +19,31 @@ export default function Hero() {
 
       <OrbitScreens />
 
-      <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted backdrop-blur">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-sky shadow-[0_0_8px_rgba(14,165,233,0.8)]" />
-          The digital signage cloud
-        </span>
-
-        <h1 className="mt-6 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_24px_rgba(2,6,23,0.85)] sm:text-5xl lg:text-7xl">
-          Run every screen from{" "}
-          <span className="text-brand-gradient">one dashboard</span>
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center pt-[calc(136px_+_3.6rem)] text-center md:pt-[calc(178px_+_3.6rem)]">
+        <h1 className="max-w-5xl text-balance text-[clamp(2.75rem,6vw,5.5rem)] font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_24px_rgba(2,6,23,0.85)]">
+          The operating system for{" "}
+          <span className="text-brand-gradient">Digital Signage</span>
         </h1>
 
-        <p className="mt-6 max-w-xl text-balance text-base leading-7 text-body sm:text-lg">
-          Upload media, build playlists, and push content to every display in
-          real time — without the busywork.
+        <p className="mt-6 max-w-3xl text-balance text-lg leading-8 text-white/70 sm:text-xl lg:text-2xl">
+          Upload media, build playlists, and publish to every screen in real
+          time — all from one powerful dashboard.
         </p>
 
-        <div className="mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <Button asChild size="lg" withArrow className="w-full sm:w-auto">
-            <Link href="/register">Start free</Link>
+        <div className="mt-8 flex w-full flex-col items-center justify-center gap-4 sm:w-auto sm:flex-row">
+          <Button
+            asChild
+            withArrow
+            className="h-14 w-full px-8 text-lg sm:w-auto"
+          >
+            <Link href="/register">Start Free</Link>
           </Button>
           <Button
             asChild
             variant="secondary"
-            size="lg"
-            className="w-full sm:w-auto"
+            className="h-14 w-full px-8 text-lg sm:w-auto"
           >
-            <Link href="#how-it-works">See how it works</Link>
+            <Link href="/login">Login</Link>
           </Button>
         </div>
       </div>

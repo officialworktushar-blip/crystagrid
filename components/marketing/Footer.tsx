@@ -1,24 +1,29 @@
 import Link from "next/link";
 
-const footerLinks = [
+const pageLinks = [
+  { href: "/", label: "Home" },
   { href: "#features", label: "Features" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#pricing", label: "Pricing" },
+];
+
+const companyLinks = [
   { href: "/login", label: "Login" },
-  { href: "/register", label: "Get Started" },
+  { href: "/register", label: "Register" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export default function Footer() {
   return (
-    <footer className="border-t border-white/5 bg-[#05060a]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+    <footer className="border-t border-white/10 bg-background">
+      <div className="mx-auto w-full max-w-7xl px-6 py-14">
+        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div className="max-w-sm">
             <Link
               href="/"
-              className="inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-white"
+              className="inline-flex items-center gap-2.5 text-lg font-bold tracking-tight text-white"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/20">
+              <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg shadow-brand">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -30,27 +35,76 @@ export default function Footer() {
               </span>
               Crystagrid
             </Link>
-            <p className="mt-3 text-sm leading-6 text-white/50">
-              Digital signage cloud for teams that need every screen in sync.
+            <p className="mt-4 text-sm leading-6 text-body">
+              Your digital screen network partner.
             </p>
           </div>
 
-          <nav className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-white/50">
-            {footerLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="transition hover:text-white"
+          <div>
+            <h2 className="text-sm font-semibold text-white">Pages</h2>
+            <nav aria-label="Pages" className="mt-4 flex flex-col gap-3">
+              {pageLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-body transition duration-200 hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold text-white">Company</h2>
+            <nav aria-label="Company" className="mt-4 flex flex-col gap-3">
+              {companyLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-body transition duration-200 hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold text-white">Contact</h2>
+            <div className="mt-4 flex flex-col gap-3 text-sm text-body">
+              <a
+                href="mailto:hello@crystagrid.com"
+                className="transition duration-200 hover:text-white"
               >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+                hello@crystagrid.com
+              </a>
+              <a
+                href="tel:+919876543210"
+                className="transition duration-200 hover:text-white"
+              >
+                +91 98765 43210
+              </a>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-white/5 pt-6 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} Crystagrid. All rights reserved.</p>
-          <p>Built for screens everywhere.</p>
+        <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p>© 2026 Crystagrid. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <Link
+              href="/privacy"
+              className="transition duration-200 hover:text-white"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="transition duration-200 hover:text-white"
+            >
+              Terms
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

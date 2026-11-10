@@ -14,12 +14,9 @@ export default function Hero() {
         aria-hidden="true"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-b from-[#05060a]/85 via-[#05060a]/60 to-[#05060a]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.12),transparent_55%)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
 
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <OrbitScreens />
-      </div>
+      <OrbitScreens />
 
       <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-white/70 backdrop-blur">

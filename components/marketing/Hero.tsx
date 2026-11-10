@@ -1,5 +1,4 @@
 import Link from "next/link";
-import OrbitScreens from "@/components/marketing/OrbitScreens";
 import Button from "@/components/ui/Button";
 
 export default function Hero() {
@@ -16,8 +15,6 @@ export default function Hero() {
       />
 
       <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
-
-      <OrbitScreens />
 
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center pt-[calc(136px_+_3.6rem)] text-center md:pt-[calc(178px_+_3.6rem)]">
         <h1 className="max-w-5xl text-balance text-[clamp(2.75rem,6vw,5.5rem)] font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_24px_rgba(2,6,23,0.85)]">

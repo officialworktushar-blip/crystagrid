@@ -132,11 +132,7 @@ export default function Navbar() {
           Crystagrid
         </Link>
 
-        <div className="hidden flex-1 flex-col items-center gap-1.5 lg:flex">
-          <span className="whitespace-nowrap rounded-full border border-sky-400/40 bg-sky-400/10 px-5 py-1.5 text-sm font-semibold tracking-[0.2em] text-sky-400">
-            One Dashboard. Every Screen.
-          </span>
-
+        <div className="hidden flex-1 items-center justify-center lg:flex">
           <nav
             aria-label="Main navigation"
             className="flex items-center gap-10"

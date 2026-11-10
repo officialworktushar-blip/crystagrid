@@ -13,10 +13,14 @@ import {
   Loader2,
   Monitor,
   Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
   X,
 } from "lucide-react";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
+import { notifyScreens } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import type { PairingResult, Screen } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -74,6 +78,12 @@ export default function ScreensClient({
   const [pairing, setPairing] = useState<PairingResult | null>(null);
   const [secondsRemaining, setSecondsRemaining] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState<{
+    id: string;
+    event: "refresh" | "restart";
+  } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const closeModal = useCallback(() => {
     setIsOpen(false);
@@ -146,6 +156,58 @@ export default function ScreensClient({
     const timeout = window.setTimeout(() => setCopied(false), 2000);
     return () => window.clearTimeout(timeout);
   }, [copied]);
+
+  useEffect(() => {
+    if (!sent) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setSent(null), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [sent]);
+
+  async function handleScreenSignal(
+    screenId: string,
+    event: "refresh" | "restart",
+  ) {
+    setActionError(null);
+    await notifyScreens([screenId], event);
+    setSent({ id: screenId, event });
+  }
+
+  async function handleDelete(screen: Screen) {
+    const confirmed = window.confirm(
+      `Delete "${screen.name}"? This cannot be undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(screen.id);
+    setActionError(null);
+
+    try {
+      await notifyScreens([screen.id], "refresh");
+
+      const supabase = createClient();
+      const { error: deleteError } = await supabase
+        .from("screens")
+        .delete()
+        .eq("id", screen.id);
+
+      if (deleteError) {
+        setActionError(deleteError.message);
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setActionError("Could not delete this screen. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function openModal() {
     setScreenName("");
@@ -234,6 +296,7 @@ export default function ScreensClient({
       </div>
 
       {loadError ? <ErrorMessage message={loadError} /> : null}
+      {actionError ? <ErrorMessage message={actionError} /> : null}
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-surface">
         <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-4 border-b border-white/5 px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted md:grid">
@@ -295,6 +358,49 @@ export default function ScreensClient({
                   <span className="truncate text-sm text-body">
                     {screen.location ?? "—"}
                   </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 md:col-span-4">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleScreenSignal(screen.id, "refresh")}
+                    className="gap-2"
+                  >
+                    <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleScreenSignal(screen.id, "restart")}
+                    className="gap-2"
+                  >
+                    <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+                    Restart player
+                  </Button>
+                  {sent?.id === screen.id ? (
+                    <span className="text-xs font-medium text-emerald-300">
+                      Sent
+                    </span>
+                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void handleDelete(screen)}
+                    disabled={deletingId === screen.id}
+                    className="ml-auto gap-2 text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                  >
+                    {deletingId === screen.id ? (
+                      <Loader2
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 animate-spin"
+                      />
+                    ) : (
+                      <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                    )}
+                    {deletingId === screen.id ? "Deleting..." : "Delete"}
+                  </Button>
                 </div>
               </li>
             ))}

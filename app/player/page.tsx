@@ -23,6 +23,7 @@ interface PlayerItem {
 interface PollResponse {
   status: PlayerStatus;
   expires_at: string | null;
+  screen_id: string | null;
   screen_name: string | null;
   playlist_id: string | null;
   items: PlayerItem[];
@@ -163,6 +164,7 @@ function parsePollResponse(data: unknown): PollResponse | null {
   return {
     status,
     expires_at: typeof row.expires_at === "string" ? row.expires_at : null,
+    screen_id: typeof row.screen_id === "string" ? row.screen_id : null,
     screen_name: typeof row.screen_name === "string" ? row.screen_name : null,
     playlist_id: typeof row.playlist_id === "string" ? row.playlist_id : null,
     items,
@@ -234,6 +236,7 @@ export default function PlayerPage() {
   const supabase = useMemo(() => createClient(), []);
   const [view, setView] = useState<PlayerView>("connecting");
   const [code, setCode] = useState<string | null>(null);
+  const [screenId, setScreenId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
   const [screenName, setScreenName] = useState<string | null>(null);
@@ -250,6 +253,7 @@ export default function PlayerPage() {
   const codeRef = useRef<string | null>(null);
   const signatureRef = useRef("");
   const codeRequestInFlightRef = useRef(false);
+  const pollInFlightRef = useRef(false);
   const cueTimerRef = useRef<number | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -301,6 +305,7 @@ export default function PlayerPage() {
       writeStorage(EXPIRES_KEY, payload.expires_at);
 
       setCode(payload.code);
+      setScreenId(null);
       setExpiresAt(payload.expires_at);
       setRemainingMs(remainingFromExpiry(payload.expires_at));
       setScreenName(null);
@@ -328,6 +333,7 @@ export default function PlayerPage() {
     removeStorage(EXPIRES_KEY);
 
     setCode(null);
+    setScreenId(null);
     setExpiresAt(null);
     setRemainingMs(0);
     setScreenName(null);
@@ -345,6 +351,7 @@ export default function PlayerPage() {
       if (response.status === "paired") {
         const nextSignature = makeSignature(response.items);
 
+        setScreenId(response.screen_id);
         setScreenName(response.screen_name);
         setRemainingMs(0);
         setView("paired");
@@ -367,6 +374,8 @@ export default function PlayerPage() {
         const nextCode = codeRef.current ?? readStorage(CODE_KEY);
         const nextExpires = response.expires_at ?? readStorage(EXPIRES_KEY);
 
+        setScreenId(null);
+
         if (nextExpires) {
           setExpiresAt(nextExpires);
           setRemainingMs(remainingFromExpiry(nextExpires));
@@ -388,6 +397,30 @@ export default function PlayerPage() {
     },
     [resetToNewCode, startFreshCode],
   );
+
+  const pollNow = useCallback(async () => {
+    if (pollInFlightRef.current) {
+      return;
+    }
+
+    const token = tokenRef.current;
+
+    if (!token) {
+      return;
+    }
+
+    pollInFlightRef.current = true;
+
+    try {
+      const response = await pollOnce(token);
+
+      if (response) {
+        handlePollResponse(response);
+      }
+    } finally {
+      pollInFlightRef.current = false;
+    }
+  }, [handlePollResponse, pollOnce]);
 
   useEffect(() => {
     if (bootstrappedRef.current) {
@@ -461,84 +494,64 @@ export default function PlayerPage() {
       return;
     }
 
-    let cancelled = false;
-    let inFlight = false;
+    const interval = window.setInterval(() => {
+      void pollNow();
+    }, 30000);
 
-    async function poll() {
-      if (cancelled || inFlight) {
-        return;
-      }
+    return () => window.clearInterval(interval);
+  }, [view, pollNow]);
 
-      const token = tokenRef.current;
-
-      if (!token) {
-        return;
-      }
-
-      inFlight = true;
-
-      try {
-        const response = await pollOnce(token);
-
-        if (!cancelled && response) {
-          handlePollResponse(response);
-        }
-      } finally {
-        inFlight = false;
-      }
+  useEffect(() => {
+    if (view !== "waiting" || !code) {
+      return;
     }
 
-    const interval = window.setInterval(() => {
-      void poll();
-    }, 3000);
+    const channel = supabase.channel(`pair:${code}`);
+
+    channel.on("broadcast", { event: "paired" }, () => {
+      void pollNow();
+    });
+
+    channel.subscribe();
 
     return () => {
-      cancelled = true;
-      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
     };
-  }, [view, pollOnce, handlePollResponse]);
+  }, [view, code, supabase, pollNow]);
 
   useEffect(() => {
     if (view !== "paired") {
       return;
     }
 
-    let cancelled = false;
-    let inFlight = false;
+    const interval = window.setInterval(() => {
+      void pollNow();
+    }, 30000);
 
-    async function heartbeat() {
-      if (cancelled || inFlight) {
-        return;
-      }
+    return () => window.clearInterval(interval);
+  }, [view, pollNow]);
 
-      const token = tokenRef.current;
-
-      if (!token) {
-        return;
-      }
-
-      inFlight = true;
-
-      try {
-        const response = await pollOnce(token);
-
-        if (!cancelled && response) {
-          handlePollResponse(response);
-        }
-      } finally {
-        inFlight = false;
-      }
+  useEffect(() => {
+    if (view !== "paired" || !screenId) {
+      return;
     }
 
-    const interval = window.setInterval(() => {
-      void heartbeat();
-    }, 20000);
+    const channel = supabase.channel(`screen:${screenId}`);
+
+    channel.on("broadcast", { event: "refresh" }, () => {
+      void pollNow();
+    });
+
+    channel.on("broadcast", { event: "restart" }, () => {
+      window.location.reload();
+    });
+
+    channel.subscribe();
 
     return () => {
-      cancelled = true;
-      window.clearInterval(interval);
+      void supabase.removeChannel(channel);
     };
-  }, [view, pollOnce, handlePollResponse]);
+  }, [view, screenId, supabase, pollNow]);
 
   useEffect(() => {
     if (view !== "waiting" || !expiresAt) {

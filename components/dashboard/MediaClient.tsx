@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import { notifyScreens } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import type { Media, MediaType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -407,6 +408,19 @@ export default function MediaClient({
       setMedia((current) =>
         current.filter((mediaItem) => mediaItem.id !== item.id),
       );
+
+      const { data: screenRows } = await supabase
+        .from("screens")
+        .select("id")
+        .eq("customer_id", userId);
+
+      const screenIds = (screenRows ?? [])
+        .map((row) => (typeof row.id === "string" ? row.id : null))
+        .filter((id): id is string => id !== null);
+
+      if (screenIds.length > 0) {
+        await notifyScreens(screenIds, "refresh");
+      }
 
       const { error: storageError } = await supabase.storage
         .from("media")

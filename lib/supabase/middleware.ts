@@ -54,9 +54,11 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isDashboardRoute =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isAdminRoute =
+    pathname === "/admin" || pathname.startsWith("/admin/");
   const isAuthRoute = AUTH_ROUTES.has(pathname);
 
-  if (!user && isDashboardRoute) {
+  if (!user && (isDashboardRoute || isAdminRoute)) {
     return redirectTo(request, supabaseResponse, "/login");
   }
 

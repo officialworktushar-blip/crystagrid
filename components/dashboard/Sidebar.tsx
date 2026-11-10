@@ -9,9 +9,11 @@ import {
   LayoutDashboard,
   ListVideo,
   Monitor,
+  ShieldCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
+import type { UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -27,14 +29,23 @@ const navItems: NavItem[] = [
   { label: "Playlists", href: "/dashboard/playlists", icon: ListVideo },
 ];
 
+const adminNavItem: NavItem = {
+  label: "Admin Panel",
+  href: "/admin",
+  icon: ShieldCheck,
+};
+
 export default function Sidebar({
   open,
   onClose,
+  role,
 }: {
   open: boolean;
   onClose: () => void;
+  role: UserRole;
 }) {
   const pathname = usePathname();
+  const items = role === "admin" ? [...navItems, adminNavItem] : navItems;
 
   useEffect(() => {
     if (!open) {
@@ -113,7 +124,7 @@ export default function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-5" aria-label="Dashboard">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"

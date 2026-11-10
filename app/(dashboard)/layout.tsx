@@ -38,7 +38,12 @@ export default async function DashboardLayout({
 
   return (
     <DashboardShell
-      user={{ name, company, email: user.email ?? "" }}
+      user={{
+        name,
+        company,
+        email: user.email ?? "",
+        role: profile?.role ?? "customer",
+      }}
     >
       {children}
     </DashboardShell>

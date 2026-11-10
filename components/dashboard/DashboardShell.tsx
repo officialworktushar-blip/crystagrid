@@ -3,11 +3,13 @@
 import { useCallback, useState, type ReactNode } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import Topbar from "@/components/dashboard/Topbar";
+import type { UserRole } from "@/lib/types";
 
 type DashboardUser = {
   name: string;
   company: string | null;
   email: string;
+  role: UserRole;
 };
 
 export default function DashboardShell({
@@ -23,7 +25,11 @@ export default function DashboardShell({
 
   return (
     <div className="min-h-screen bg-background text-white">
-      <Sidebar open={sidebarOpen} onClose={closeSidebar} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={closeSidebar}
+        role={user.role}
+      />
 
       <div className="lg:pl-64">
         <Topbar user={user} onOpenSidebar={openSidebar} />

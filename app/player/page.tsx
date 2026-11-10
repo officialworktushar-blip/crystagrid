@@ -250,7 +250,7 @@ export default function PlayerPage() {
   const codeRef = useRef<string | null>(null);
   const signatureRef = useRef("");
   const codeRequestInFlightRef = useRef(false);
-  const cueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cueTimerRef = useRef<number | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   const pollOnce = useCallback(
@@ -613,7 +613,7 @@ export default function PlayerPage() {
   }, []);
 
   useEffect(() => {
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let idleTimer: number | null = null;
 
     function scheduleIdle() {
       if (idleTimer) {

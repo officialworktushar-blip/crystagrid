@@ -76,7 +76,9 @@ export default function PlaylistEditor({
     notifyTimerRef.current = window.setTimeout(() => {
       const screenIds = Array.from(
         new Set(
-          screenPlaylistsRef.current.map((assignment) => assignment.screen_id),
+          screenPlaylistsRef.current
+            .filter((assignment) => assignment.playlist_id === playlist.id)
+            .map((assignment) => assignment.screen_id),
         ),
       );
 
@@ -86,7 +88,7 @@ export default function PlaylistEditor({
 
       notifyTimerRef.current = null;
     }, NOTIFY_DEBOUNCE_MS);
-  }, []);
+  }, [playlist.id]);
 
   const mediaById = useMemo(
     () =>

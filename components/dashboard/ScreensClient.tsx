@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
-import { notifyScreens } from "@/lib/realtime";
+import { notifyChannel, notifyScreens } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
 import type { PairingResult, Screen } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -259,6 +259,7 @@ export default function ScreensClient({
           : Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)),
       );
       setPairing(result);
+      void notifyChannel(`pair:${result.code}`, "paired");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

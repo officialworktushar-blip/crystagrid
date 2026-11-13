@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type FormEvent,
 } from "react";
 import {
   Check,
   Copy,
+  ListVideo,
   Loader2,
   Monitor,
   Plus,
@@ -22,7 +24,12 @@ import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
 import { notifyChannel, notifyScreens } from "@/lib/realtime";
 import { createClient } from "@/lib/supabase/client";
-import type { PairingResult, Screen } from "@/lib/types";
+import type {
+  PairingResult,
+  Playlist,
+  Screen,
+  ScreenPlaylist,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const lastSeenFormatter = new Intl.DateTimeFormat("en", {
@@ -65,12 +72,19 @@ function ErrorMessage({ message }: { message: string }) {
 
 export default function ScreensClient({
   screens,
+  playlists,
+  screenPlaylists,
   loadError,
 }: {
   screens: Screen[];
+  playlists: Playlist[];
+  screenPlaylists: ScreenPlaylist[];
   loadError: string | null;
 }) {
   const router = useRouter();
+  const [assignments, setAssignments] =
+    useState<ScreenPlaylist[]>(screenPlaylists);
+  const [savingPlaylistId, setSavingPlaylistId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [screenName, setScreenName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,6 +98,93 @@ export default function ScreensClient({
   } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const assignmentByScreen = useMemo(
+    () =>
+      new Map<string, ScreenPlaylist>(
+        assignments.map((assignment) => [assignment.screen_id, assignment]),
+      ),
+    [assignments],
+  );
+
+  const playlistNameById = useMemo(
+    () =>
+      new Map<string, string>(
+        playlists.map((playlist) => [playlist.id, playlist.name] as const),
+      ),
+    [playlists],
+  );
+
+  async function handlePlaylistChange(screen: Screen, playlistId: string) {
+    setSavingPlaylistId(screen.id);
+    setActionError(null);
+
+    const previousAssignments = assignments;
+    const existing = assignmentByScreen.get(screen.id);
+    const supabase = createClient();
+
+    if (!playlistId) {
+      setAssignments((current) =>
+        current.filter((assignment) => assignment.screen_id !== screen.id),
+      );
+
+      const { error: deleteError } = await supabase
+        .from("screen_playlists")
+        .delete()
+        .eq("screen_id", screen.id);
+
+      if (deleteError) {
+        setAssignments(previousAssignments);
+        setActionError(deleteError.message);
+        setSavingPlaylistId(null);
+        return;
+      }
+    } else {
+      const optimistic: ScreenPlaylist = {
+        id: existing?.id ?? `assignment-${screen.id}`,
+        screen_id: screen.id,
+        playlist_id: playlistId,
+        is_active: true,
+        created_at: existing?.created_at ?? new Date().toISOString(),
+      };
+
+      setAssignments((current) => [
+        ...current.filter((assignment) => assignment.screen_id !== screen.id),
+        optimistic,
+      ]);
+
+      const { data, error: upsertError } = await supabase
+        .from("screen_playlists")
+        .upsert(
+          {
+            screen_id: screen.id,
+            playlist_id: playlistId,
+            is_active: true,
+          },
+          { onConflict: "screen_id" },
+        )
+        .select("id, screen_id, playlist_id, is_active, created_at")
+        .single();
+
+      if (upsertError || !data) {
+        setAssignments(previousAssignments);
+        setActionError(
+          upsertError?.message ??
+            "Could not update the playlist for this screen.",
+        );
+        setSavingPlaylistId(null);
+        return;
+      }
+
+      setAssignments((current) => [
+        ...current.filter((assignment) => assignment.screen_id !== screen.id),
+        data as ScreenPlaylist,
+      ]);
+    }
+
+    void notifyScreens([screen.id], "refresh");
+    setSavingPlaylistId(null);
+  }
 
   const closeModal = useCallback(() => {
     setIsOpen(false);
@@ -322,7 +423,13 @@ export default function ScreensClient({
           </div>
         ) : (
           <ul className="divide-y divide-white/5">
-            {screens.map((screen) => (
+            {screens.map((screen) => {
+              const assignment = assignmentByScreen.get(screen.id);
+              const assignedPlaylistName = assignment
+                ? (playlistNameById.get(assignment.playlist_id) ?? "Playlist")
+                : null;
+
+              return (
               <li
                 key={screen.id}
                 className="grid gap-3 px-5 py-4 sm:px-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] md:items-center md:gap-4"
@@ -359,6 +466,44 @@ export default function ScreensClient({
                   <span className="truncate text-sm text-body">
                     {screen.location ?? "—"}
                   </span>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between md:col-span-4">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <ListVideo
+                      aria-hidden="true"
+                      className="h-4 w-4 shrink-0 text-brand-sky"
+                    />
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+                      Playlist
+                    </span>
+                    <span className="truncate text-sm text-white">
+                      {assignedPlaylistName ?? "None"}
+                    </span>
+                  </div>
+
+                  <select
+                    aria-label={`Playlist for ${screen.name}`}
+                    value={assignment?.playlist_id ?? ""}
+                    onChange={(event) =>
+                      void handlePlaylistChange(screen, event.target.value)
+                    }
+                    disabled={savingPlaylistId === screen.id}
+                    className="h-9 w-full rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60 sm:w-auto sm:max-w-[240px]"
+                  >
+                    <option value="" className="bg-surface text-white">
+                      No playlist
+                    </option>
+                    {playlists.map((playlist) => (
+                      <option
+                        key={playlist.id}
+                        value={playlist.id}
+                        className="bg-surface text-white"
+                      >
+                        {playlist.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 md:col-span-4">
@@ -404,7 +549,8 @@ export default function ScreensClient({
                   </Button>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

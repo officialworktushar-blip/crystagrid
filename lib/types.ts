@@ -59,7 +59,7 @@ export interface PlaylistItem {
   playlist_id: string;
   media_id: string;
   position: number;
-  duration_seconds?: number | null;
+  duration: number | null;
   created_at: string;
 }
 
@@ -67,6 +67,7 @@ export interface ScreenPlaylist {
   id: string;
   screen_id: string;
   playlist_id: string;
+  is_active: boolean;
   created_at: string;
 }
 

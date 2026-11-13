@@ -23,7 +23,7 @@ export function isOnline(
     return false;
   }
 
-  return Math.abs(now - seenAt) <= ONLINE_WINDOW_MS;
+  return now - seenAt <= ONLINE_WINDOW_MS;
 }
 
 export function formatRelativeTime(
@@ -62,17 +62,13 @@ export function formatRelativeTime(
 }
 
 export function getScreenStatus(
-  status: ScreenStatus,
+  _status: ScreenStatus,
   lastSeen: string | null | undefined,
   now = Date.now(),
 ): ScreenStatus {
-  if (isOnline(lastSeen, now)) {
-    return "online";
-  }
-
-  if (status === "pending") {
+  if (!lastSeen) {
     return "pending";
   }
 
-  return "offline";
+  return isOnline(lastSeen, now) ? "online" : "offline";
 }

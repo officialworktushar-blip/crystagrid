@@ -44,6 +44,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { getMediaUrl } from "@/lib/media";
 import { notifyScreens } from "@/lib/realtime";
+import { isOnline } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import type {
   Media,
@@ -60,8 +61,6 @@ const MEDIA_FILTERS: { label: string; value: "all" | MediaType }[] = [
   { label: "Images", value: "image" },
   { label: "Videos", value: "video" },
 ];
-
-const ONLINE_WINDOW_MS = 60_000;
 
 type SaveState = "idle" | "saving" | "saved";
 
@@ -82,16 +81,6 @@ function createTempId(prefix: string) {
   }
 
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function isScreenOnline(screen: Screen, now: number) {
-  if (!screen.last_seen || now <= 0) {
-    return false;
-  }
-
-  const lastSeen = Date.parse(screen.last_seen);
-
-  return Number.isFinite(lastSeen) && now - lastSeen <= ONLINE_WINDOW_MS;
 }
 
 function MediaPreview({
@@ -1031,7 +1020,7 @@ export default function PlaylistEditor({
                     ? (playlistNameById.get(assignment.playlist_id) ??
                       "another playlist")
                     : null;
-                const online = isScreenOnline(screen, now);
+                const online = isOnline(screen.last_seen, now);
                 const isBusy = busyScreenId === screen.id;
 
                 return (

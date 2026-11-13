@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Card from "@/components/ui/Card";
+import { isOnline } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -58,9 +59,8 @@ export default async function DashboardPage() {
         .eq("customer_id", user.id),
       supabase
         .from("screens")
-        .select("id", { count: "exact", head: true })
-        .eq("customer_id", user.id)
-        .eq("status", "online"),
+        .select("last_seen")
+        .eq("customer_id", user.id),
       supabase
         .from("media")
         .select("id", { count: "exact", head: true })
@@ -72,6 +72,9 @@ export default async function DashboardPage() {
     ]);
 
   const screensCount = screensResult.count ?? 0;
+  const onlineScreens = (
+    (onlineResult.data ?? []) as { last_seen: string | null }[]
+  ).filter((screen) => isOnline(screen.last_seen)).length;
   const hasError = [
     screensResult.error,
     onlineResult.error,
@@ -88,7 +91,7 @@ export default async function DashboardPage() {
     },
     {
       label: "Online",
-      value: onlineResult.count ?? 0,
+      value: onlineScreens,
       accent: "text-emerald-300",
       icon: Wifi,
     },

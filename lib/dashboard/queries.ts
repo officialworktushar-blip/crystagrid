@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isOnline } from "@/lib/screens";
 import type { DashboardStats, Profile, Screen } from "@/lib/types";
 
 export async function getProfile(
@@ -46,9 +47,8 @@ export async function getDashboardStats(
       .eq("customer_id", customerId),
     supabase
       .from("screens")
-      .select("id", { count: "exact", head: true })
-      .eq("customer_id", customerId)
-      .eq("status", "online"),
+      .select("last_seen")
+      .eq("customer_id", customerId),
     supabase
       .from("media")
       .select("id", { count: "exact", head: true })
@@ -61,7 +61,9 @@ export async function getDashboardStats(
 
   return {
     totalScreens: screens.count ?? 0,
-    onlineScreens: onlineScreens.count ?? 0,
+    onlineScreens: (
+      (onlineScreens.data ?? []) as { last_seen: string | null }[]
+    ).filter((screen) => isOnline(screen.last_seen)).length,
     mediaFiles: media.count ?? 0,
     playlists: playlists.count ?? 0,
   };

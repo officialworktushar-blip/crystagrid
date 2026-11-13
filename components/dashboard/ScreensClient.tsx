@@ -1,16 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type ChangeEvent,
+  type ClipboardEvent,
   type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
-  Check,
-  Copy,
   ListVideo,
   Loader2,
   Monitor,
@@ -23,14 +26,12 @@ import {
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
 import { notifyChannel, notifyScreens } from "@/lib/realtime";
+import { getScreenStatus } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
-import type {
-  PairingResult,
-  Playlist,
-  Screen,
-  ScreenPlaylist,
-} from "@/lib/types";
-import { cn } from "@/lib/utils";
+import type { Playlist, Screen, ScreenPlaylist } from "@/lib/types";
+
+const CODE_LENGTH = 6;
+const REFRESH_INTERVAL_MS = 15_000;
 
 const lastSeenFormatter = new Intl.DateTimeFormat("en", {
   dateStyle: "medium",
@@ -50,13 +51,6 @@ function formatLastSeen(value: string | null) {
   }
 
   return lastSeenFormatter.format(date);
-}
-
-function formatCountdown(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-
-  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
 function ErrorMessage({ message }: { message: string }) {
@@ -85,19 +79,23 @@ export default function ScreensClient({
   const [assignments, setAssignments] =
     useState<ScreenPlaylist[]>(screenPlaylists);
   const [savingPlaylistId, setSavingPlaylistId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [isOpen, setIsOpen] = useState(false);
+  const [code, setCode] = useState<string[]>(() =>
+    Array<string>(CODE_LENGTH).fill(""),
+  );
   const [screenName, setScreenName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pairing, setPairing] = useState<PairingResult | null>(null);
-  const [secondsRemaining, setSecondsRemaining] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [sent, setSent] = useState<{
     id: string;
     event: "refresh" | "restart";
   } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const codeInputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   const assignmentByScreen = useMemo(
     () =>
@@ -188,12 +186,10 @@ export default function ScreensClient({
 
   const closeModal = useCallback(() => {
     setIsOpen(false);
+    setCode(Array<string>(CODE_LENGTH).fill(""));
     setScreenName("");
     setLoading(false);
     setError(null);
-    setPairing(null);
-    setSecondsRemaining(0);
-    setCopied(false);
     router.refresh();
   }, [router]);
 
@@ -226,37 +222,38 @@ export default function ScreensClient({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!pairing) {
-      return;
+    function refresh() {
+      setNow(Date.now());
+
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
     }
 
-    const expiresAt = Date.parse(pairing.expires_at);
+    const interval = window.setInterval(refresh, REFRESH_INTERVAL_MS);
 
-    if (Number.isNaN(expiresAt)) {
-      setSecondsRemaining(0);
-      return;
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
     }
 
-    const updateCountdown = () => {
-      setSecondsRemaining(
-        Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)),
-      );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-
-    updateCountdown();
-    const interval = window.setInterval(updateCountdown, 1000);
-
-    return () => window.clearInterval(interval);
-  }, [pairing]);
+  }, [router]);
 
   useEffect(() => {
-    if (!copied) {
+    if (!success) {
       return;
     }
 
-    const timeout = window.setTimeout(() => setCopied(false), 2000);
+    const timeout = window.setTimeout(() => setSuccess(null), 4000);
     return () => window.clearTimeout(timeout);
-  }, [copied]);
+  }, [success]);
 
   useEffect(() => {
     if (!sent) {
@@ -278,7 +275,7 @@ export default function ScreensClient({
 
   async function handleDelete(screen: Screen) {
     const confirmed = window.confirm(
-      `Delete "${screen.name}"? This cannot be undone.`,
+      `Delete "${screen.name}"? This will unpair the screen. It will show a new code.`,
     );
 
     if (!confirmed) {
@@ -311,18 +308,102 @@ export default function ScreensClient({
   }
 
   function openModal() {
+    setCode(Array<string>(CODE_LENGTH).fill(""));
     setScreenName("");
     setError(null);
-    setPairing(null);
-    setSecondsRemaining(0);
-    setCopied(false);
     setIsOpen(true);
+  }
+
+  function updateCode(index: number, digits: string) {
+    const next = [...code];
+    const characters = digits.replace(/\D/g, "").split("");
+    let cursor = index;
+
+    if (characters.length === 0) {
+      next[index] = "";
+      setCode(next);
+      return;
+    }
+
+    for (const character of characters) {
+      if (cursor >= CODE_LENGTH) {
+        break;
+      }
+
+      next[cursor] = character;
+      cursor += 1;
+    }
+
+    setCode(next);
+    codeInputsRef.current[Math.min(cursor, CODE_LENGTH - 1)]?.focus();
+  }
+
+  function handleCodeChange(
+    index: number,
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const digits = event.target.value.replace(/\D/g, "");
+    updateCode(index, digits);
+  }
+
+  function handleCodeKeyDown(
+    index: number,
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ) {
+    if (event.key === "Backspace" && !code[index] && index > 0) {
+      event.preventDefault();
+
+      const next = [...code];
+      next[index - 1] = "";
+      setCode(next);
+      codeInputsRef.current[index - 1]?.focus();
+      return;
+    }
+
+    if (event.key === "ArrowLeft" && index > 0) {
+      event.preventDefault();
+      codeInputsRef.current[index - 1]?.focus();
+      return;
+    }
+
+    if (event.key === "ArrowRight" && index < CODE_LENGTH - 1) {
+      event.preventDefault();
+      codeInputsRef.current[index + 1]?.focus();
+    }
+  }
+
+  function handleCodePaste(event: ClipboardEvent<HTMLInputElement>) {
+    event.preventDefault();
+
+    const digits = event.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, CODE_LENGTH);
+
+    if (!digits) {
+      return;
+    }
+
+    const next = Array<string>(CODE_LENGTH).fill("");
+
+    digits.split("").forEach((digit, index) => {
+      next[index] = digit;
+    });
+
+    setCode(next);
+    codeInputsRef.current[Math.min(digits.length, CODE_LENGTH - 1)]?.focus();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedName = screenName.trim();
+    const enteredCode = code.join("");
+
+    if (code.some((digit) => !digit)) {
+      setError("Enter the 6-digit code shown on your screen.");
+      return;
+    }
 
     if (!trimmedName) {
       setError("Enter a name for this screen.");
@@ -335,54 +416,42 @@ export default function ScreensClient({
     try {
       const supabase = createClient();
       const { data, error: rpcError } = await supabase.rpc(
-        "generate_pairing_code",
+        "claim_device_code",
         {
+          p_code: enteredCode,
           p_screen_name: trimmedName,
         },
       );
 
       if (rpcError) {
-        setError(rpcError.message);
+        setError("Invalid or expired code. Check the number on your screen.");
         return;
       }
 
-      const result = data as PairingResult | null;
+      const payload = (Array.isArray(data) ? data[0] : data) as
+        | { screen_id?: unknown }
+        | null;
+      const pairedScreenId =
+        typeof data === "string"
+          ? data
+          : typeof payload?.screen_id === "string"
+            ? payload.screen_id
+            : null;
 
-      if (!result?.code || !result.screen_id || !result.expires_at) {
-        setError("The pairing code could not be generated.");
+      if (!pairedScreenId) {
+        setError("Invalid or expired code. Check the number on your screen.");
         return;
       }
 
-      const expiresAt = Date.parse(result.expires_at);
-      setSecondsRemaining(
-        Number.isNaN(expiresAt)
-          ? 0
-          : Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)),
-      );
-      setPairing(result);
-      void notifyChannel(`pair:${result.code}`, "paired");
+      void notifyChannel(`pair:${enteredCode}`, "paired");
+      setSuccess("Screen paired successfully.");
+      closeModal();
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
-
-  async function handleCopy() {
-    if (!pairing) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(pairing.code);
-      setError(null);
-      setCopied(true);
-    } catch {
-      setError("Could not copy the code. Select it manually.");
-    }
-  }
-
-  const expired = secondsRemaining <= 0;
 
   return (
     <div className="space-y-5">
@@ -393,10 +462,18 @@ export default function ScreensClient({
 
         <Button onClick={openModal} className="shrink-0 px-5">
           <Plus aria-hidden="true" className="h-4 w-4" />
-          Add Screen
+          Pair Screen
         </Button>
       </div>
 
+      {success ? (
+        <p
+          role="status"
+          className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200"
+        >
+          {success}
+        </p>
+      ) : null}
       {loadError ? <ErrorMessage message={loadError} /> : null}
       {actionError ? <ErrorMessage message={actionError} /> : null}
 
@@ -417,8 +494,8 @@ export default function ScreensClient({
               No screens yet
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-              Use Add Screen to generate a pairing code and connect your first
-              display.
+              Use Pair Screen and enter the code shown on your display to
+              connect your first screen.
             </p>
           </div>
         ) : (
@@ -447,7 +524,13 @@ export default function ScreensClient({
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted md:hidden">
                     Status
                   </span>
-                  <StatusBadge status={screen.status} />
+                  <StatusBadge
+                    status={getScreenStatus(
+                      screen.status,
+                      screen.last_seen,
+                      now,
+                    )}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between gap-3 md:block">
@@ -567,7 +650,7 @@ export default function ScreensClient({
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby={pairing ? "pairing-code-title" : "add-screen-title"}
+            aria-labelledby="pair-screen-title"
             className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-surface p-6 shadow-card"
           >
             <button
@@ -579,140 +662,106 @@ export default function ScreensClient({
               <X className="h-5 w-5" />
             </button>
 
-            {pairing ? (
-              <div className="text-center">
-                <h2
-                  id="pairing-code-title"
-                  className="text-lg font-semibold tracking-tight text-white"
+            <form onSubmit={handleSubmit}>
+              <h2
+                id="pair-screen-title"
+                className="text-lg font-semibold tracking-tight text-white"
+              >
+                Pair a screen
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-body">
+                Open{" "}
+                <Link
+                  href="/player"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-brand-sky underline-offset-4 hover:underline"
                 >
-                  Screen pairing code
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-body">
-                  Enter this code on{" "}
-                  <span className="font-medium text-white">{screenName}</span> to
-                  finish pairing.
-                </p>
+                  /player
+                </Link>{" "}
+                on your screen to see the 6-digit code.
+              </p>
 
-                <div
-                  role="group"
-                  aria-label={`Pairing code ${pairing.code}`}
-                  className="mt-6 flex justify-center gap-1.5 sm:gap-2"
+              <div className="mt-5">
+                <label
+                  htmlFor="screen-name"
+                  className="mb-2 block text-sm font-medium text-white"
                 >
-                  {pairing.code.split("").map((digit, index) => (
-                    <span
-                      key={`${digit}-${index}`}
-                      aria-hidden="true"
-                      className="flex h-14 w-10 items-center justify-center rounded-2xl border border-sky-400/30 bg-sky-400/10 text-2xl font-extrabold text-sky-100 sm:w-11"
-                    >
-                      {digit}
-                    </span>
+                  Screen name
+                </label>
+                <input
+                  id="screen-name"
+                  name="screenName"
+                  type="text"
+                  autoFocus
+                  maxLength={80}
+                  value={screenName}
+                  onChange={(event) => setScreenName(event.target.value)}
+                  disabled={loading}
+                  placeholder="Lobby display"
+                  className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60"
+                />
+              </div>
+
+              <fieldset className="mt-5">
+                <legend className="mb-2 block text-sm font-medium text-white">
+                  6-digit code
+                </legend>
+                <div className="flex justify-between gap-1.5 sm:gap-2">
+                  {Array.from({ length: CODE_LENGTH }).map((_, index) => (
+                    <input
+                      key={index}
+                      ref={(element) => {
+                        codeInputsRef.current[index] = element;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={code[index]}
+                      onChange={(event) => handleCodeChange(index, event)}
+                      onKeyDown={(event) => handleCodeKeyDown(index, event)}
+                      onPaste={handleCodePaste}
+                      onFocus={(event) => event.currentTarget.select()}
+                      disabled={loading}
+                      aria-label={`Digit ${index + 1} of ${CODE_LENGTH}`}
+                      className="h-14 w-10 rounded-2xl border border-white/10 bg-white/5 text-center text-2xl font-extrabold text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60 sm:w-11"
+                    />
                   ))}
                 </div>
+              </fieldset>
 
-                <div className="mt-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <p
-                    aria-live="polite"
-                    className={cn(
-                      "text-sm font-medium",
-                      expired ? "text-amber-300" : "text-body",
-                    )}
-                  >
-                    {expired
-                      ? "This code has expired."
-                      : `Expires in ${formatCountdown(secondsRemaining)}`}
-                  </p>
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="gap-2"
-                  >
-                    {copied ? (
-                      <Check aria-hidden="true" className="h-4 w-4" />
-                    ) : (
-                      <Copy aria-hidden="true" className="h-4 w-4" />
-                    )}
-                    {copied ? "Copied" : "Copy code"}
-                  </Button>
+              {error ? (
+                <div className="mt-4">
+                  <ErrorMessage message={error} />
                 </div>
+              ) : null}
 
-                {error ? (
-                  <div className="mt-4">
-                    <ErrorMessage message={error} />
-                  </div>
-                ) : null}
-
-                <Button onClick={closeModal} className="mt-6 w-full">
-                  Done
+              <div className="mt-6 flex gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeModal}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 gap-2"
+                >
+                  {loading ? (
+                    <Loader2
+                      aria-hidden="true"
+                      className="h-4 w-4 animate-spin"
+                    />
+                  ) : null}
+                  {loading ? "Pairing..." : "Pair screen"}
                 </Button>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit}>
-                <h2
-                  id="add-screen-title"
-                  className="text-lg font-semibold tracking-tight text-white"
-                >
-                  Add a screen
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-body">
-                  Give the screen a name so you can recognise it later. We will
-                  generate a 6-digit code to pair it.
-                </p>
-
-                <div className="mt-5">
-                  <label
-                    htmlFor="screen-name"
-                    className="mb-2 block text-sm font-medium text-white"
-                  >
-                    Screen name
-                  </label>
-                  <input
-                    id="screen-name"
-                    name="screenName"
-                    type="text"
-                    autoFocus
-                    required
-                    maxLength={80}
-                    value={screenName}
-                    onChange={(event) => setScreenName(event.target.value)}
-                    disabled={loading}
-                    placeholder="Lobby display"
-                    className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60"
-                  />
-                </div>
-
-                {error ? (
-                  <div className="mt-4">
-                    <ErrorMessage message={error} />
-                  </div>
-                ) : null}
-
-                <div className="mt-6 flex gap-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={closeModal}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 gap-2"
-                  >
-                    {loading ? (
-                      <Loader2
-                        aria-hidden="true"
-                        className="h-4 w-4 animate-spin"
-                      />
-                    ) : null}
-                    {loading ? "Generating..." : "Generate code"}
-                  </Button>
-                </div>
-              </form>
-            )}
+            </form>
           </div>
         </div>
       ) : null}

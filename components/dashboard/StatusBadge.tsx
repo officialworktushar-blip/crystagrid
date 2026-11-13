@@ -7,7 +7,7 @@ const statusStyles: Record<
 > = {
   online: {
     badge: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-    dot: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
+    dot: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse",
     label: "Online",
   },
   offline: {

@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   ListVideo,
   Monitor,
-  ShieldCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -24,28 +23,20 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Screens", href: "/dashboard/screens", icon: Monitor },
+  { label: "My Screens", href: "/dashboard/screens", icon: Monitor },
   { label: "Media", href: "/dashboard/media", icon: Images },
   { label: "Playlists", href: "/dashboard/playlists", icon: ListVideo },
 ];
 
-const adminNavItem: NavItem = {
-  label: "Admin Panel",
-  href: "/admin",
-  icon: ShieldCheck,
-};
-
 export default function Sidebar({
   open,
   onClose,
-  role,
 }: {
   open: boolean;
   onClose: () => void;
   role: UserRole;
 }) {
   const pathname = usePathname();
-  const items = role === "admin" ? [...navItems, adminNavItem] : navItems;
 
   useEffect(() => {
     if (!open) {
@@ -95,23 +86,29 @@ export default function Sidebar({
         )}
       >
         <div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
-          <Link
-            href="/dashboard"
-            onClick={onClose}
-            className="flex items-center gap-2.5 text-base font-bold tracking-tight text-white"
-          >
-            <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg shadow-brand">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-4 w-4 text-white"
-              >
-                <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-              </svg>
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <Link
+              href="/dashboard"
+              onClick={onClose}
+              className="flex items-center gap-2.5 text-base font-bold tracking-tight text-white"
+            >
+              <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg shadow-brand">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="h-4 w-4 text-white"
+                >
+                  <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+                </svg>
+              </span>
+              Crystagrid
+            </Link>
+
+            <span className="ml-10 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200">
+              View only
             </span>
-            Crystagrid
-          </Link>
+          </div>
 
           <button
             type="button"
@@ -124,7 +121,7 @@ export default function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-5" aria-label="Dashboard">
-          {items.map((item) => {
+          {navItems.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"

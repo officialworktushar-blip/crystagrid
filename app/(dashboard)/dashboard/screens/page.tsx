@@ -161,10 +161,10 @@ export default async function ScreensPage() {
           Screens
         </p>
         <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-          Your screens
+          My Screens
         </h1>
         <p className="mt-2 text-sm text-body">
-          Pair new displays and keep an eye on every screen.
+          See where your screens are and what is playing on them.
         </p>
       </div>
 

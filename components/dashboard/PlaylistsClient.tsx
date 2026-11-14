@@ -63,11 +63,15 @@ function ErrorMessage({ message }: { message: string }) {
 
 export default function PlaylistsClient({
   playlists,
-  userId,
+  customerId,
+  canEdit,
+  basePath,
   loadError,
 }: {
   playlists: PlaylistSummary[];
-  userId: string;
+  customerId: string;
+  canEdit: boolean;
+  basePath: string;
   loadError: string | null;
 }) {
   const router = useRouter();
@@ -108,12 +112,20 @@ export default function PlaylistsClient({
   }, [modal]);
 
   function openCreate() {
+    if (!canEdit) {
+      return;
+    }
+
     setName("");
     setFormError(null);
     setModal({ mode: "create" });
   }
 
   function openRename(playlist: PlaylistSummary) {
+    if (!canEdit) {
+      return;
+    }
+
     setName(playlist.name);
     setFormError(null);
     setModal({ mode: "rename", playlist });
@@ -132,7 +144,7 @@ export default function PlaylistsClient({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!modal) {
+    if (!canEdit || !modal) {
       return;
     }
 
@@ -155,7 +167,7 @@ export default function PlaylistsClient({
           .from("playlists")
           .update({ name: trimmed, updated_at: new Date().toISOString() })
           .eq("id", renameTarget.id)
-          .eq("customer_id", userId);
+          .eq("customer_id", customerId);
 
         if (error) {
           setFormError(error.message);
@@ -177,7 +189,7 @@ export default function PlaylistsClient({
 
       const { data, error } = await supabase
         .from("playlists")
-        .insert({ customer_id: userId, name: trimmed })
+        .insert({ customer_id: customerId, name: trimmed })
         .select("id")
         .single();
 
@@ -188,7 +200,7 @@ export default function PlaylistsClient({
 
       setModal(null);
       setName("");
-      router.push(`/dashboard/playlists/${data.id}`);
+      router.push(`${basePath}/playlists/${data.id}`);
     } catch {
       setFormError("Something went wrong. Please try again.");
     } finally {
@@ -197,6 +209,10 @@ export default function PlaylistsClient({
   }
 
   async function handleDelete(playlist: PlaylistSummary) {
+    if (!canEdit) {
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete "${playlist.name}"? This cannot be undone.`,
     );
@@ -213,7 +229,7 @@ export default function PlaylistsClient({
       .from("playlists")
       .delete()
       .eq("id", playlist.id)
-      .eq("customer_id", userId);
+      .eq("customer_id", customerId);
 
     if (error) {
       setActionError(error.message);
@@ -235,10 +251,12 @@ export default function PlaylistsClient({
           {items.length} {items.length === 1 ? "playlist" : "playlists"}
         </p>
 
-        <Button onClick={openCreate} className="shrink-0 px-5">
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          New Playlist
-        </Button>
+        {canEdit ? (
+          <Button onClick={openCreate} className="shrink-0 px-5">
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            New Playlist
+          </Button>
+        ) : null}
       </div>
 
       {loadError ? <ErrorMessage message={loadError} /> : null}
@@ -254,13 +272,16 @@ export default function PlaylistsClient({
               No playlists yet
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-              Create a playlist, fill it with images and videos, then assign it
-              to a screen.
+              {canEdit
+                ? "Create a playlist, fill it with images and videos, then assign it to a screen."
+                : "Playlists created for this account will appear here."}
             </p>
-            <Button onClick={openCreate} className="mt-6">
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              New Playlist
-            </Button>
+            {canEdit ? (
+              <Button onClick={openCreate} className="mt-6">
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                New Playlist
+              </Button>
+            ) : null}
           </div>
         </Card>
       ) : (
@@ -271,7 +292,7 @@ export default function PlaylistsClient({
               className="flex flex-col overflow-hidden p-0 hover:border-sky-500/40 hover:shadow-card"
             >
               <Link
-                href={`/dashboard/playlists/${playlist.id}`}
+                href={`${basePath}/playlists/${playlist.id}`}
                 className="group flex flex-1 flex-col gap-4 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -301,40 +322,42 @@ export default function PlaylistsClient({
                 </div>
               </Link>
 
-              <div className="flex items-center gap-2 border-t border-white/5 px-5 py-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => openRename(playlist)}
-                  className="gap-2"
-                >
-                  <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
-                  Rename
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleDelete(playlist)}
-                  disabled={deletingId === playlist.id}
-                  className="ml-auto gap-2 text-red-300 hover:bg-red-400/10 hover:text-red-200"
-                >
-                  {deletingId === playlist.id ? (
-                    <Loader2
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5 animate-spin"
-                    />
-                  ) : (
-                    <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
-                  )}
-                  {deletingId === playlist.id ? "Deleting..." : "Delete"}
-                </Button>
-              </div>
+              {canEdit ? (
+                <div className="flex items-center gap-2 border-t border-white/5 px-5 py-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openRename(playlist)}
+                    className="gap-2"
+                  >
+                    <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+                    Rename
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void handleDelete(playlist)}
+                    disabled={deletingId === playlist.id}
+                    className="ml-auto gap-2 text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                  >
+                    {deletingId === playlist.id ? (
+                      <Loader2
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 animate-spin"
+                      />
+                    ) : (
+                      <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                    )}
+                    {deletingId === playlist.id ? "Deleting..." : "Delete"}
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           ))}
         </div>
       )}
 
-      {modal ? (
+      {modal && canEdit ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <button
             type="button"

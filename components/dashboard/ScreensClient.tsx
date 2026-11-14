@@ -14,9 +14,15 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
+  ChevronDown,
+  ChevronUp,
+  Film,
+  Images,
   ListVideo,
   Loader2,
+  MapPin,
   Monitor,
+  Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -25,10 +31,16 @@ import {
 } from "lucide-react";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
+import { getMediaUrl } from "@/lib/media";
 import { notifyChannel, notifyScreens } from "@/lib/realtime";
 import { getScreenStatus } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
-import type { Playlist, Screen, ScreenPlaylist } from "@/lib/types";
+import type {
+  MediaType,
+  Playlist,
+  Screen,
+  ScreenPlaylist,
+} from "@/lib/types";
 
 const CODE_LENGTH = 6;
 const REFRESH_INTERVAL_MS = 15_000;
@@ -64,16 +76,131 @@ function ErrorMessage({ message }: { message: string }) {
   );
 }
 
+export type ScreenContentItem = {
+  id: string;
+  name: string;
+  type: MediaType;
+  file_path: string;
+  duration: number | null;
+};
+
+export type ScreenContentMap = Record<string, ScreenContentItem[]>;
+
+function formatDuration(seconds: number | null) {
+  const total = Math.max(0, Math.round(seconds ?? 10));
+  const minutes = Math.floor(total / 60);
+  const remaining = total % 60;
+
+  if (minutes === 0) {
+    return `${remaining}s`;
+  }
+
+  return `${minutes}m ${remaining.toString().padStart(2, "0")}s`;
+}
+
+function ScreenContentSection({ items }: { items: ScreenContentItem[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="rounded-2xl border border-white/5 bg-white/[0.02] md:col-span-4">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Images
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-brand-sky"
+          />
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
+            Content on this screen
+          </span>
+          <span className="text-sm text-white">
+            {items.length} {items.length === 1 ? "item" : "items"}
+          </span>
+        </span>
+        {open ? (
+          <ChevronUp aria-hidden="true" className="h-4 w-4 shrink-0 text-muted" />
+        ) : (
+          <ChevronDown
+            aria-hidden="true"
+            className="h-4 w-4 shrink-0 text-muted"
+          />
+        )}
+      </button>
+
+      {open ? (
+        items.length === 0 ? (
+          <p className="border-t border-white/5 px-4 py-4 text-sm text-body">
+            This screen has no content assigned yet.
+          </p>
+        ) : (
+          <ul className="space-y-2 border-t border-white/5 px-3 py-3">
+            {items.map((item, index) => (
+              <li
+                key={item.id}
+                className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-2"
+              >
+                <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                  {item.type === "video" ? (
+                    <video
+                      src={getMediaUrl(item.file_path)}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={getMediaUrl(item.file_path)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-white">
+                    {item.name}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+                    {item.type === "video" ? (
+                      <Film aria-hidden="true" className="h-3 w-3" />
+                    ) : (
+                      <Images aria-hidden="true" className="h-3 w-3" />
+                    )}
+                    {item.type === "video" ? "Video" : "Image"}
+                    <span aria-hidden="true">·</span>
+                    {formatDuration(item.duration)}
+                  </p>
+                </div>
+                <span className="text-xs text-muted">#{index + 1}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 export default function ScreensClient({
   screens,
   playlists,
   screenPlaylists,
   loadError,
+  customerId,
+  canEdit,
+  contentByScreen,
 }: {
   screens: Screen[];
   playlists: Playlist[];
   screenPlaylists: ScreenPlaylist[];
   loadError: string | null;
+  customerId: string;
+  canEdit: boolean;
+  contentByScreen: ScreenContentMap;
 }) {
   const router = useRouter();
   const [assignments, setAssignments] =
@@ -85,6 +212,7 @@ export default function ScreensClient({
     Array<string>(CODE_LENGTH).fill(""),
   );
   const [screenName, setScreenName] = useState("");
+  const [pairLocation, setPairLocation] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -94,6 +222,11 @@ export default function ScreensClient({
   } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editingScreen, setEditingScreen] = useState<Screen | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const codeInputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -114,6 +247,10 @@ export default function ScreensClient({
   );
 
   async function handlePlaylistChange(screen: Screen, playlistId: string) {
+    if (!canEdit) {
+      return;
+    }
+
     setSavingPlaylistId(screen.id);
     setActionError(null);
 
@@ -188,6 +325,7 @@ export default function ScreensClient({
     setIsOpen(false);
     setCode(Array<string>(CODE_LENGTH).fill(""));
     setScreenName("");
+    setPairLocation("");
     setLoading(false);
     setError(null);
     router.refresh();
@@ -268,12 +406,20 @@ export default function ScreensClient({
     screenId: string,
     event: "refresh" | "restart",
   ) {
+    if (!canEdit) {
+      return;
+    }
+
     setActionError(null);
     await notifyScreens([screenId], event);
     setSent({ id: screenId, event });
   }
 
   async function handleDelete(screen: Screen) {
+    if (!canEdit) {
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete "${screen.name}"? This will unpair the screen. It will show a new code.`,
     );
@@ -308,10 +454,74 @@ export default function ScreensClient({
   }
 
   function openModal() {
+    if (!canEdit) {
+      return;
+    }
+
     setCode(Array<string>(CODE_LENGTH).fill(""));
     setScreenName("");
+    setPairLocation("");
     setError(null);
     setIsOpen(true);
+  }
+
+  function openEditModal(screen: Screen) {
+    if (!canEdit) {
+      return;
+    }
+
+    setEditingScreen(screen);
+    setEditName(screen.name);
+    setEditLocation(screen.location ?? "");
+    setEditError(null);
+  }
+
+  function closeEditModal() {
+    setEditingScreen(null);
+    setEditName("");
+    setEditLocation("");
+    setEditError(null);
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canEdit || !editingScreen) {
+      return;
+    }
+
+    const trimmedName = editName.trim();
+
+    if (!trimmedName) {
+      setEditError("Enter a name for this screen.");
+      return;
+    }
+
+    setEditError(null);
+    setSavingEdit(true);
+
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("screens")
+        .update({
+          name: trimmedName,
+          location: editLocation.trim() || null,
+        })
+        .eq("id", editingScreen.id);
+
+      if (updateError) {
+        setEditError(updateError.message);
+        return;
+      }
+
+      closeEditModal();
+      router.refresh();
+    } catch {
+      setEditError("Could not update this screen. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   function updateCode(index: number, digits: string) {
@@ -397,7 +607,12 @@ export default function ScreensClient({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!canEdit) {
+      return;
+    }
+
     const trimmedName = screenName.trim();
+    const trimmedLocation = pairLocation.trim();
     const enteredCode = code.join("");
 
     if (code.some((digit) => !digit)) {
@@ -420,6 +635,8 @@ export default function ScreensClient({
         {
           p_code: enteredCode,
           p_screen_name: trimmedName,
+          p_customer_id: customerId,
+          p_location: trimmedLocation || null,
         },
       );
 
@@ -460,10 +677,12 @@ export default function ScreensClient({
           {screens.length} {screens.length === 1 ? "screen" : "screens"}
         </p>
 
-        <Button onClick={openModal} className="shrink-0 px-5">
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          Pair Screen
-        </Button>
+        {canEdit ? (
+          <Button onClick={openModal} className="shrink-0 px-5">
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Pair Screen
+          </Button>
+        ) : null}
       </div>
 
       {success ? (
@@ -494,8 +713,9 @@ export default function ScreensClient({
               No screens yet
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-              Use Pair Screen and enter the code shown on your display to
-              connect your first screen.
+              {canEdit
+                ? "Use Pair Screen and enter the code shown on your display to connect your first screen."
+                : "Screens connected to this account will appear here."}
             </p>
           </div>
         ) : (
@@ -546,8 +766,14 @@ export default function ScreensClient({
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted md:hidden">
                     Location
                   </span>
-                  <span className="truncate text-sm text-body">
-                    {screen.location ?? "—"}
+                  <span className="flex min-w-0 items-center gap-1.5 text-sm text-body">
+                    <MapPin
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0 text-muted"
+                    />
+                    <span className="truncate">
+                      {screen.location ?? "Location not set"}
+                    </span>
                   </span>
                 </div>
 
@@ -565,72 +791,95 @@ export default function ScreensClient({
                     </span>
                   </div>
 
-                  <select
-                    aria-label={`Playlist for ${screen.name}`}
-                    value={assignment?.playlist_id ?? ""}
-                    onChange={(event) =>
-                      void handlePlaylistChange(screen, event.target.value)
-                    }
-                    disabled={savingPlaylistId === screen.id}
-                    className="h-9 w-full rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60 sm:w-auto sm:max-w-[240px]"
-                  >
-                    <option value="" className="bg-surface text-white">
-                      No playlist
-                    </option>
-                    {playlists.map((playlist) => (
-                      <option
-                        key={playlist.id}
-                        value={playlist.id}
-                        className="bg-surface text-white"
-                      >
-                        {playlist.name}
+                  {canEdit ? (
+                    <select
+                      aria-label={`Playlist for ${screen.name}`}
+                      value={assignment?.playlist_id ?? ""}
+                      onChange={(event) =>
+                        void handlePlaylistChange(screen, event.target.value)
+                      }
+                      disabled={savingPlaylistId === screen.id}
+                      className="h-9 w-full rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60 sm:w-auto sm:max-w-[240px]"
+                    >
+                      <option value="" className="bg-surface text-white">
+                        No playlist
                       </option>
-                    ))}
-                  </select>
+                      {playlists.map((playlist) => (
+                        <option
+                          key={playlist.id}
+                          value={playlist.id}
+                          className="bg-surface text-white"
+                        >
+                          {playlist.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 md:col-span-4">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void handleScreenSignal(screen.id, "refresh")}
-                    className="gap-2"
-                  >
-                    <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
-                    Refresh
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void handleScreenSignal(screen.id, "restart")}
-                    className="gap-2"
-                  >
-                    <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
-                    Restart player
-                  </Button>
-                  {sent?.id === screen.id ? (
-                    <span className="text-xs font-medium text-emerald-300">
-                      Sent
-                    </span>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void handleDelete(screen)}
-                    disabled={deletingId === screen.id}
-                    className="ml-auto gap-2 text-red-300 hover:bg-red-400/10 hover:text-red-200"
-                  >
-                    {deletingId === screen.id ? (
-                      <Loader2
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5 animate-spin"
-                      />
-                    ) : (
-                      <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
-                    )}
-                    {deletingId === screen.id ? "Deleting..." : "Delete"}
-                  </Button>
-                </div>
+                {canEdit ? (
+                  <div className="flex flex-wrap items-center gap-2 md:col-span-4">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openEditModal(screen)}
+                      className="gap-2"
+                    >
+                      <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        void handleScreenSignal(screen.id, "refresh")
+                      }
+                      className="gap-2"
+                    >
+                      <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+                      Refresh
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        void handleScreenSignal(screen.id, "restart")
+                      }
+                      className="gap-2"
+                    >
+                      <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+                      Restart player
+                    </Button>
+                    {sent?.id === screen.id ? (
+                      <span className="text-xs font-medium text-emerald-300">
+                        Sent
+                      </span>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleDelete(screen)}
+                      disabled={deletingId === screen.id}
+                      className="ml-auto gap-2 text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                    >
+                      {deletingId === screen.id ? (
+                        <Loader2
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 animate-spin"
+                        />
+                      ) : (
+                        <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                      )}
+                      {deletingId === screen.id ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                ) : null}
+
+                {!canEdit ? (
+                  <ScreenContentSection
+                    items={contentByScreen[screen.id] ?? []}
+                  />
+                ) : null}
               </li>
               );
             })}
@@ -638,7 +887,7 @@ export default function ScreensClient({
         )}
       </div>
 
-      {isOpen ? (
+      {isOpen && canEdit ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <button
             type="button"
@@ -703,6 +952,27 @@ export default function ScreensClient({
                 />
               </div>
 
+              <div className="mt-5">
+                <label
+                  htmlFor="screen-location"
+                  className="mb-2 block text-sm font-medium text-white"
+                >
+                  Location{" "}
+                  <span className="font-normal text-muted">(optional)</span>
+                </label>
+                <input
+                  id="screen-location"
+                  name="screenLocation"
+                  type="text"
+                  maxLength={120}
+                  value={pairLocation}
+                  onChange={(event) => setPairLocation(event.target.value)}
+                  disabled={loading}
+                  placeholder="Front entrance"
+                  className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60"
+                />
+              </div>
+
               <fieldset className="mt-5">
                 <legend className="mb-2 block text-sm font-medium text-white">
                   6-digit code
@@ -759,6 +1029,117 @@ export default function ScreensClient({
                     />
                   ) : null}
                   {loading ? "Pairing..." : "Pair screen"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {editingScreen && canEdit ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close modal"
+            onClick={closeEditModal}
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-screen-title"
+            className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-surface p-6 shadow-card"
+          >
+            <button
+              type="button"
+              onClick={closeEditModal}
+              aria-label="Close"
+              className="absolute right-4 top-4 rounded-full p-1.5 text-white/40 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <form onSubmit={handleEditSubmit}>
+              <h2
+                id="edit-screen-title"
+                className="text-lg font-semibold tracking-tight text-white"
+              >
+                Edit screen
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-body">
+                Update the name and location shown for this screen.
+              </p>
+
+              <div className="mt-5">
+                <label
+                  htmlFor="edit-screen-name"
+                  className="mb-2 block text-sm font-medium text-white"
+                >
+                  Screen name
+                </label>
+                <input
+                  id="edit-screen-name"
+                  name="editScreenName"
+                  type="text"
+                  autoFocus
+                  maxLength={80}
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  disabled={savingEdit}
+                  placeholder="Lobby display"
+                  className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60"
+                />
+              </div>
+
+              <div className="mt-4">
+                <label
+                  htmlFor="edit-screen-location"
+                  className="mb-2 block text-sm font-medium text-white"
+                >
+                  Location{" "}
+                  <span className="font-normal text-muted">(optional)</span>
+                </label>
+                <input
+                  id="edit-screen-location"
+                  name="editScreenLocation"
+                  type="text"
+                  maxLength={120}
+                  value={editLocation}
+                  onChange={(event) => setEditLocation(event.target.value)}
+                  disabled={savingEdit}
+                  placeholder="Front entrance"
+                  className="h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60"
+                />
+              </div>
+
+              {editError ? (
+                <div className="mt-4">
+                  <ErrorMessage message={editError} />
+                </div>
+              ) : null}
+
+              <div className="mt-6 flex gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeEditModal}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="flex-1 gap-2"
+                >
+                  {savingEdit ? (
+                    <Loader2
+                      aria-hidden="true"
+                      className="h-4 w-4 animate-spin"
+                    />
+                  ) : null}
+                  {savingEdit ? "Saving..." : "Save changes"}
                 </Button>
               </div>
             </form>

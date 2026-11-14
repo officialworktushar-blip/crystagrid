@@ -195,11 +195,13 @@ function buildUploadItem(file: File): UploadItem {
 
 export default function MediaClient({
   initialMedia,
-  userId,
+  customerId,
+  canEdit,
   loadError,
 }: {
   initialMedia: Media[];
-  userId: string;
+  customerId: string;
+  canEdit: boolean;
   loadError: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -270,7 +272,7 @@ export default function MediaClient({
         error: null,
       });
 
-      const path = `${userId}/${createId()}.${getFileExtension(item.file)}`;
+      const path = `${customerId}/${createId()}.${getFileExtension(item.file)}`;
       const { error: uploadError } = await supabase.storage
         .from("media")
         .upload(path, item.file, {
@@ -297,7 +299,7 @@ export default function MediaClient({
       const { data: inserted, error: insertError } = await supabase
         .from("media")
         .insert({
-          customer_id: userId,
+          customer_id: customerId,
           name: item.file.name,
           type: mediaType,
           file_path: path,
@@ -381,6 +383,10 @@ export default function MediaClient({
   }
 
   async function handleDelete(item: Media) {
+    if (!canEdit) {
+      return;
+    }
+
     const confirmed = window.confirm(
       `Delete "${item.name}"? This cannot be undone.`,
     );
@@ -398,7 +404,7 @@ export default function MediaClient({
         .from("media")
         .delete()
         .eq("id", item.id)
-        .eq("customer_id", userId);
+        .eq("customer_id", customerId);
 
       if (rowError) {
         setError(rowError.message);
@@ -412,7 +418,7 @@ export default function MediaClient({
       const { data: screenRows } = await supabase
         .from("screens")
         .select("id")
-        .eq("customer_id", userId);
+        .eq("customer_id", customerId);
 
       const screenIds = (screenRows ?? [])
         .map((row) => (typeof row.id === "string" ? row.id : null))
@@ -517,23 +523,24 @@ export default function MediaClient({
         </p>
       ) : null}
 
-      <Card
-        role="button"
-        tabIndex={0}
-        onClick={openFilePicker}
-        onKeyDown={handleDropZoneKeyDown}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        className={cn(
-          "flex cursor-pointer flex-col items-center justify-center border-dashed px-6 text-center outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-sky-400/60",
-          media.length === 0 ? "py-16" : "py-9",
-          isDragging
-            ? "border-sky-400/60 bg-sky-400/[0.06] shadow-card"
-            : "bg-white/[0.02] hover:border-sky-400/40",
-        )}
-      >
+      {canEdit ? (
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={openFilePicker}
+          onKeyDown={handleDropZoneKeyDown}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          className={cn(
+            "flex cursor-pointer flex-col items-center justify-center border-dashed px-6 text-center outline-none transition duration-200 focus-visible:ring-2 focus-visible:ring-sky-400/60",
+            media.length === 0 ? "py-16" : "py-9",
+            isDragging
+              ? "border-sky-400/60 bg-sky-400/[0.06] shadow-card"
+              : "bg-white/[0.02] hover:border-sky-400/40",
+          )}
+        >
         <input
           ref={inputRef}
           type="file"
@@ -566,7 +573,8 @@ export default function MediaClient({
           <span className="font-medium text-brand-sky">browse your files</span>.
           Up to 500 MB per file.
         </p>
-      </Card>
+        </Card>
+      ) : null}
 
       {uploads.length > 0 ? (
         <Card
@@ -674,8 +682,9 @@ export default function MediaClient({
             No media yet
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-            Upload images and videos using the zone above. Your library will
-            appear here.
+            {canEdit
+              ? "Upload images and videos using the zone above. Your library will appear here."
+              : "Media uploaded for this account will appear here."}
           </p>
         </Card>
       ) : (
@@ -727,8 +736,11 @@ export default function MediaClient({
                 No {filter === "image" ? "images" : "videos"} yet
               </h2>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-                Upload {filter === "image" ? "an image" : "a video"} or switch
-                back to all media.
+                {canEdit
+                  ? `Upload ${
+                      filter === "image" ? "an image" : "a video"
+                    } or switch back to all media.`
+                  : `No ${filter === "image" ? "images" : "videos"} have been uploaded yet.`}
               </p>
             </Card>
           ) : (
@@ -801,27 +813,29 @@ export default function MediaClient({
                           </p>
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void handleDelete(item)}
-                          disabled={isDeleting}
-                          aria-label={`Delete ${item.name}`}
-                          title="Delete"
-                          className="h-8 w-8 shrink-0 px-0 text-white/40 hover:bg-red-400/10 hover:text-red-300"
-                        >
-                          {isDeleting ? (
-                            <Loader2
-                              aria-hidden="true"
-                              className="h-4 w-4 animate-spin"
-                            />
-                          ) : (
-                            <Trash2
-                              aria-hidden="true"
-                              className="h-4 w-4"
-                            />
-                          )}
-                        </Button>
+                        {canEdit ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleDelete(item)}
+                            disabled={isDeleting}
+                            aria-label={`Delete ${item.name}`}
+                            title="Delete"
+                            className="h-8 w-8 shrink-0 px-0 text-white/40 hover:bg-red-400/10 hover:text-red-300"
+                          >
+                            {isDeleting ? (
+                              <Loader2
+                                aria-hidden="true"
+                                className="h-4 w-4 animate-spin"
+                              />
+                            ) : (
+                              <Trash2
+                                aria-hidden="true"
+                                className="h-4 w-4"
+                              />
+                            )}
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </Card>

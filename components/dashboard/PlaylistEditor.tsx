@@ -120,6 +120,7 @@ function SortableItemRow({
   index,
   mediaItem,
   busy,
+  canEdit,
   onRemove,
   onDurationInput,
   onDurationCommit,
@@ -128,6 +129,7 @@ function SortableItemRow({
   index: number;
   mediaItem: Media | undefined;
   busy: boolean;
+  canEdit: boolean;
   onRemove: (itemId: string) => void;
   onDurationInput: (itemId: string, value: string) => void;
   onDurationCommit: (itemId: string, value: string) => void;
@@ -158,15 +160,17 @@ function SortableItemRow({
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <button
-          type="button"
-          aria-label="Drag to reorder"
-          className="flex h-8 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-white/35 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical aria-hidden="true" className="h-4 w-4" />
-        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            aria-label="Drag to reorder"
+            className="flex h-8 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-white/35 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical aria-hidden="true" className="h-4 w-4" />
+          </button>
+        ) : null}
 
         <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-muted">
           {index + 1}
@@ -197,7 +201,7 @@ function SortableItemRow({
           <span className="text-xs text-muted">
             Plays full video ({formatDuration(mediaItem?.duration ?? 0)})
           </span>
-        ) : (
+        ) : canEdit ? (
           <label className="flex items-center gap-2 text-xs text-muted">
             Duration
             <input
@@ -221,22 +225,28 @@ function SortableItemRow({
             />
             <span>s</span>
           </label>
+        ) : (
+          <span className="text-xs text-muted">
+            Duration {formatDuration(item.duration ?? 10)}
+          </span>
         )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onRemove(item.id)}
-          disabled={busy}
-          aria-label="Remove item"
-          className="h-8 w-8 px-0 text-red-300 hover:bg-red-400/10 hover:text-red-200"
-        >
-          {busy ? (
-            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 aria-hidden="true" className="h-4 w-4" />
-          )}
-        </Button>
+        {canEdit ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(item.id)}
+            disabled={busy}
+            aria-label="Remove item"
+            className="h-8 w-8 px-0 text-red-300 hover:bg-red-400/10 hover:text-red-200"
+          >
+            {busy ? (
+              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
+            )}
+          </Button>
+        ) : null}
       </div>
     </li>
   );
@@ -249,6 +259,8 @@ export default function PlaylistEditor({
   screens,
   screenPlaylists,
   playlists,
+  canEdit,
+  backHref,
 }: {
   playlist: Playlist;
   initialItems: PlaylistItem[];
@@ -256,6 +268,8 @@ export default function PlaylistEditor({
   screens: Screen[];
   screenPlaylists: ScreenPlaylist[];
   playlists: Playlist[];
+  canEdit: boolean;
+  backHref: string;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<PlaylistItem[]>(initialItems);
@@ -349,6 +363,17 @@ export default function PlaylistEditor({
     [assignments],
   );
 
+  const assignedScreens = useMemo(
+    () =>
+      screens.filter(
+        (screen) =>
+          assignmentByScreen.get(screen.id)?.playlist_id === playlist.id,
+      ),
+    [screens, assignmentByScreen, playlist.id],
+  );
+
+  const visibleScreens = canEdit ? screens : assignedScreens;
+
   const sortedItems = useMemo(
     () => [...items].sort((a, b) => a.position - b.position),
     [items],
@@ -381,6 +406,10 @@ export default function PlaylistEditor({
   }, [media, filter, search]);
 
   async function handleDragEnd(event: DragEndEvent) {
+    if (!canEdit) {
+      return;
+    }
+
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
@@ -431,7 +460,7 @@ export default function PlaylistEditor({
   }
 
   async function handleAddItem(mediaItem: Media) {
-    if (busyMediaId) {
+    if (!canEdit || busyMediaId) {
       return;
     }
 
@@ -481,7 +510,7 @@ export default function PlaylistEditor({
   }
 
   async function handleRemoveItem(itemId: string) {
-    if (itemId.startsWith("item-")) {
+    if (!canEdit || itemId.startsWith("item-")) {
       return;
     }
 
@@ -554,6 +583,10 @@ export default function PlaylistEditor({
   }
 
   async function handleDurationCommit(itemId: string, value: string) {
+    if (!canEdit) {
+      return;
+    }
+
     const item = items.find((entry) => entry.id === itemId);
 
     if (!item) {
@@ -612,6 +645,10 @@ export default function PlaylistEditor({
   }
 
   async function handleNameCommit() {
+    if (!canEdit) {
+      return;
+    }
+
     const trimmed = name.trim();
 
     if (!trimmed) {
@@ -647,7 +684,7 @@ export default function PlaylistEditor({
   }
 
   async function handleToggleAssignment(screenId: string) {
-    if (busyScreenId) {
+    if (!canEdit || busyScreenId) {
       return;
     }
 
@@ -731,7 +768,7 @@ export default function PlaylistEditor({
       <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <Link
-            href="/dashboard/playlists"
+            href={backHref}
             aria-label="Back to playlists"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
           >
@@ -739,20 +776,26 @@ export default function PlaylistEditor({
           </Link>
 
           <div className="min-w-0 flex-1">
-            <input
-              type="text"
-              value={name}
-              maxLength={80}
-              aria-label="Playlist name"
-              onChange={(event) => setName(event.target.value)}
-              onBlur={() => void handleNameCommit()}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.currentTarget.blur();
-                }
-              }}
-              className="w-full max-w-xl border-b border-transparent bg-transparent text-xl font-extrabold tracking-tight text-white outline-none transition focus:border-sky-400/40 sm:text-2xl"
-            />
+            {canEdit ? (
+              <input
+                type="text"
+                value={name}
+                maxLength={80}
+                aria-label="Playlist name"
+                onChange={(event) => setName(event.target.value)}
+                onBlur={() => void handleNameCommit()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="w-full max-w-xl border-b border-transparent bg-transparent text-xl font-extrabold tracking-tight text-white outline-none transition focus:border-sky-400/40 sm:text-2xl"
+              />
+            ) : (
+              <h1 className="truncate text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+                {name}
+              </h1>
+            )}
             <p className="mt-1 text-xs text-muted">
               {sortedItems.length}{" "}
               {sortedItems.length === 1 ? "item" : "items"} ·{" "}
@@ -761,22 +804,27 @@ export default function PlaylistEditor({
           </div>
         </div>
 
-        <div
-          aria-live="polite"
-          className="flex min-h-6 items-center gap-2 pl-12 sm:pl-0"
-        >
-          {saveState === "saving" ? (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-body">
-              <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
-              Saving...
-            </span>
-          ) : saveState === "saved" ? (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
-              <Check aria-hidden="true" className="h-3.5 w-3.5" />
-              Saved
-            </span>
-          ) : null}
-        </div>
+        {canEdit ? (
+          <div
+            aria-live="polite"
+            className="flex min-h-6 items-center gap-2 pl-12 sm:pl-0"
+          >
+            {saveState === "saving" ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-body">
+                <Loader2
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 animate-spin"
+                />
+                Saving...
+              </span>
+            ) : saveState === "saved" ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                Saved
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -788,8 +836,16 @@ export default function PlaylistEditor({
         </p>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)_280px] xl:grid-cols-[280px_minmax(0,1fr)_300px]">
-        <div className="space-y-3">
+      <div
+        className={cn(
+          "grid gap-5",
+          canEdit
+            ? "lg:grid-cols-[260px_minmax(0,1fr)_280px] xl:grid-cols-[280px_minmax(0,1fr)_300px]"
+            : "lg:grid-cols-[minmax(0,1fr)_300px]",
+        )}
+      >
+        {canEdit ? (
+          <div className="space-y-3">
           <button
             type="button"
             onClick={() => setLibraryOpen((open) => !open)}
@@ -928,7 +984,8 @@ export default function PlaylistEditor({
               )}
             </div>
           </Card>
-        </div>
+          </div>
+        ) : null}
 
         <Card className="flex flex-col overflow-hidden p-0">
           <div className="border-b border-white/5 px-4 py-4 sm:px-5">
@@ -936,7 +993,9 @@ export default function PlaylistEditor({
               Playlist timeline
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Drag to reorder. Duration changes save when you leave the field.
+              {canEdit
+                ? "Drag to reorder. Duration changes save when you leave the field."
+                : "The order these items play on screen."}
             </p>
           </div>
 
@@ -949,8 +1008,9 @@ export default function PlaylistEditor({
                 This playlist is empty
               </h3>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-                Add images and videos from your library to start building the
-                loop.
+                {canEdit
+                  ? "Add images and videos from your library to start building the loop."
+                  : "This playlist has no items yet."}
               </p>
             </div>
           ) : (
@@ -974,6 +1034,7 @@ export default function PlaylistEditor({
                         index={index}
                         mediaItem={mediaItem}
                         busy={busyItemId === item.id}
+                        canEdit={canEdit}
                         onRemove={(itemId) => void handleRemoveItem(itemId)}
                         onDurationInput={handleDurationInput}
                         onDurationCommit={(itemId, value) =>
@@ -991,28 +1052,34 @@ export default function PlaylistEditor({
         <Card className="flex flex-col overflow-hidden p-0">
           <div className="border-b border-white/5 px-4 py-4">
             <h2 className="text-sm font-semibold text-white">
-              Assign to screens
+              {canEdit ? "Assign to screens" : "Assigned screens"}
             </h2>
             <p className="mt-1 text-xs text-muted">
-              A screen can only play one playlist at a time.
+              {canEdit
+                ? "A screen can only play one playlist at a time."
+                : "Screens currently using this playlist."}
             </p>
           </div>
 
-          {screens.length === 0 ? (
+          {visibleScreens.length === 0 ? (
             <div className="px-4 py-12 text-center">
               <p className="text-sm text-body">
-                Pair a screen before assigning a playlist.
+                {canEdit
+                  ? "Pair a screen before assigning a playlist."
+                  : "This playlist is not assigned to any screen."}
               </p>
-              <Link
-                href="/dashboard/screens"
-                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-              >
-                Go to screens
-              </Link>
+              {canEdit ? (
+                <Link
+                  href="/dashboard/screens"
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                >
+                  Go to screens
+                </Link>
+              ) : null}
             </div>
           ) : (
             <ul className="divide-y divide-white/5">
-              {screens.map((screen) => {
+              {visibleScreens.map((screen) => {
                 const assignment = assignmentByScreen.get(screen.id);
                 const assigned = assignment?.playlist_id === playlist.id;
                 const otherPlaylistName =
@@ -1053,28 +1120,30 @@ export default function PlaylistEditor({
                         ) : null}
                       </div>
 
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={assigned}
-                        aria-label={`${assigned ? "Unassign" : "Assign"} playlist for ${screen.name}`}
-                        onClick={() => void handleToggleAssignment(screen.id)}
-                        disabled={isBusy}
-                        className={cn(
-                          "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-60",
-                          assigned
-                            ? "brand-gradient border-transparent"
-                            : "border-white/10 bg-white/10",
-                        )}
-                      >
-                        <span
-                          aria-hidden="true"
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={assigned}
+                          aria-label={`${assigned ? "Unassign" : "Assign"} playlist for ${screen.name}`}
+                          onClick={() => void handleToggleAssignment(screen.id)}
+                          disabled={isBusy}
                           className={cn(
-                            "absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-all duration-200",
-                            assigned ? "left-6" : "left-1",
+                            "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-60",
+                            assigned
+                              ? "brand-gradient border-transparent"
+                              : "border-white/10 bg-white/10",
                           )}
-                        />
-                      </button>
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-all duration-200",
+                              assigned ? "left-6" : "left-1",
+                            )}
+                          />
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 );

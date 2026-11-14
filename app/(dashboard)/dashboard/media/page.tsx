@@ -13,12 +13,15 @@ export default async function MediaPage() {
     redirect("/login");
   }
 
+  const customerId = user.id;
+  const canEdit = false;
+
   const { data, error } = await supabase
     .from("media")
     .select(
       "id, customer_id, name, type, file_path, file_size, duration, created_at",
     )
-    .eq("customer_id", user.id)
+    .eq("customer_id", customerId)
     .order("created_at", { ascending: false });
 
   const media = (data ?? []) as Media[];
@@ -39,7 +42,8 @@ export default async function MediaPage() {
 
       <MediaClient
         initialMedia={media}
-        userId={user.id}
+        customerId={customerId}
+        canEdit={canEdit}
         loadError={error?.message ?? null}
       />
     </div>

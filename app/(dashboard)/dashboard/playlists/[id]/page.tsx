@@ -32,12 +32,13 @@ export default async function PlaylistDetailPage({
     .from("playlists")
     .select("id, customer_id, name, created_at, updated_at")
     .eq("id", id)
-    .eq("customer_id", user.id)
     .maybeSingle();
 
   if (!playlistData) {
     notFound();
   }
+
+  const customerId = playlistData.customer_id;
 
   const [itemsResult, mediaResult, screensResult, playlistsResult] =
     await Promise.all([
@@ -51,17 +52,17 @@ export default async function PlaylistDetailPage({
         .select(
           "id, customer_id, name, type, file_path, file_size, duration, created_at",
         )
-        .eq("customer_id", user.id)
+        .eq("customer_id", customerId)
         .order("created_at", { ascending: false }),
       supabase
         .from("screens")
         .select("id, customer_id, name, status, last_seen, location, created_at")
-        .eq("customer_id", user.id)
+        .eq("customer_id", customerId)
         .order("created_at", { ascending: false }),
       supabase
         .from("playlists")
         .select("id, customer_id, name, created_at, updated_at")
-        .eq("customer_id", user.id)
+        .eq("customer_id", customerId)
         .order("created_at", { ascending: false }),
     ]);
 
@@ -96,6 +97,8 @@ export default async function PlaylistDetailPage({
       screens={screens}
       screenPlaylists={screenPlaylists}
       playlists={playlists}
+      canEdit={false}
+      backHref="/dashboard/playlists"
     />
   );
 }

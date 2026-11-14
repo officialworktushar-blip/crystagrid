@@ -23,10 +23,14 @@ export default async function PlaylistsPage() {
     redirect("/login");
   }
 
+  const customerId = user.id;
+  const canEdit = false;
+  const basePath = "/dashboard";
+
   const { data, error } = await supabase
     .from("playlists")
     .select("id, customer_id, name, created_at, updated_at")
-    .eq("customer_id", user.id)
+    .eq("customer_id", customerId)
     .order("created_at", { ascending: false });
 
   const playlists = (data ?? []) as Playlist[];
@@ -47,7 +51,7 @@ export default async function PlaylistsPage() {
       supabase
         .from("media")
         .select("id, type, duration")
-        .eq("customer_id", user.id),
+        .eq("customer_id", customerId),
     ]);
 
     items = (itemsResult.data ?? []) as PlaylistItemRow[];
@@ -99,7 +103,9 @@ export default async function PlaylistsPage() {
 
       <PlaylistsClient
         playlists={summaries}
-        userId={user.id}
+        customerId={customerId}
+        canEdit={canEdit}
+        basePath={basePath}
         loadError={error?.message ?? relatedError}
       />
     </div>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Monitor,
@@ -24,6 +25,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Customers", href: "/admin/customers", icon: Users },
+  { label: "Leads", href: "/admin/leads", icon: Inbox },
   { label: "Screens", href: "/admin/screens", icon: Monitor },
 ];
 

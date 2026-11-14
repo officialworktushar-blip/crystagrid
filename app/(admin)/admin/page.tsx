@@ -3,6 +3,7 @@ import {
   ArrowRight,
   HardDrive,
   Images,
+  Inbox,
   Monitor,
   Users,
   Wifi,
@@ -67,7 +68,7 @@ export default async function AdminOverviewPage() {
   const supabase = await createClient();
   const now = Date.now();
 
-  const [statsResult, screensResult] = await Promise.all([
+  const [statsResult, screensResult, leadsResult] = await Promise.all([
     supabase.rpc("admin_customer_stats"),
     supabase
       .from("screens")
@@ -75,6 +76,7 @@ export default async function AdminOverviewPage() {
       .not("last_seen", "is", null)
       .order("last_seen", { ascending: false })
       .limit(8),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
   ]);
 
   const customers = normalizeAdminCustomerStats(statsResult.data);
@@ -114,6 +116,12 @@ export default async function AdminOverviewPage() {
       accent: "text-violet-300",
     },
     {
+      label: "Leads",
+      value: String(leadsResult.count ?? 0),
+      icon: Inbox,
+      accent: "text-pink-300",
+    },
+    {
       label: "Total screens",
       value: String(totalScreens),
       icon: Monitor,
@@ -139,7 +147,9 @@ export default async function AdminOverviewPage() {
     },
   ];
 
-  const hasError = Boolean(statsResult.error || screensResult.error);
+  const hasError = Boolean(
+    statsResult.error || screensResult.error || leadsResult.error,
+  );
 
   return (
     <div className="space-y-8">
@@ -164,7 +174,7 @@ export default async function AdminOverviewPage() {
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {statCards.map((card) => (
           <AdminStatCard key={card.label} {...card} />
         ))}

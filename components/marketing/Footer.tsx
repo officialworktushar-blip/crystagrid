@@ -73,6 +73,12 @@ export default function Footer() {
           <div>
             <h2 className="text-sm font-semibold text-white">Contact</h2>
             <div className="mt-4 flex flex-col gap-3 text-sm text-body">
+              <Link
+                href="/contact"
+                className="font-medium text-white transition duration-200 hover:text-brand-sky"
+              >
+                Contact us
+              </Link>
               <a
                 href="mailto:hello@crystagrid.com"
                 className="transition duration-200 hover:text-white"

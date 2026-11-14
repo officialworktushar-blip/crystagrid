@@ -175,7 +175,7 @@ export default function Navbar() {
 
         <div className="hidden shrink-0 lg:block">
           <Button asChild withArrow className="h-[52px] px-8 text-lg">
-            <Link href="mailto:hello@crystagrid.com">Contact Us</Link>
+            <Link href="/contact">Contact Us</Link>
           </Button>
         </div>
 
@@ -288,7 +288,7 @@ export default function Navbar() {
                 withArrow
                 className="h-[52px] w-full px-8 text-lg"
               >
-                <Link href="mailto:hello@crystagrid.com">Contact Us</Link>
+                <Link href="/contact">Contact Us</Link>
               </Button>
             </div>
           </div>

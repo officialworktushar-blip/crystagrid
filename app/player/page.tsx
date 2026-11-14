@@ -4,6 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { getMediaUrl } from "@/lib/media";
+import {
+  cacheItems,
+  getPlayableUrl,
+  loadLastPlaylist,
+  pruneCache,
+  saveLastPlaylist,
+  type PlayerItem,
+} from "@/lib/player-cache";
 
 const TOKEN_KEY = "crystagrid_device_token";
 const CODE_KEY = "crystagrid_player_code";
@@ -11,14 +19,6 @@ const EXPIRES_KEY = "crystagrid_player_expires_at";
 
 type PlayerView = "connecting" | "waiting" | "paired";
 type PlayerStatus = "waiting" | "expired" | "invalid" | "paired";
-type MediaType = "image" | "video";
-
-interface PlayerItem {
-  id: string;
-  type: MediaType;
-  file_path: string;
-  duration: number | null;
-}
 
 interface PollResponse {
   status: PlayerStatus;
@@ -199,6 +199,35 @@ function remainingFromExpiry(expiresAt: string | null): number {
   return Number.isFinite(target) ? Math.max(0, target - Date.now()) : 0;
 }
 
+function usePlayableUrl(url: string | null): string | null {
+  const [resolved, setResolved] = useState<{
+    url: string | null;
+    value: string | null;
+  }>({ url, value: url });
+
+  useEffect(() => {
+    if (!url) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getPlayableUrl(url)
+      .then((next) => {
+        if (!cancelled) {
+          setResolved({ url, value: next });
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return resolved.url === url ? resolved.value : url;
+}
+
 function BrandLogo() {
   return (
     <div className="flex items-center gap-3">
@@ -247,6 +276,7 @@ export default function PlayerPage() {
   const [cursorHidden, setCursorHidden] = useState(false);
   const [fullscreenCueVisible, setFullscreenCueVisible] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   const bootstrappedRef = useRef(false);
   const tokenRef = useRef<string | null>(null);
@@ -346,9 +376,39 @@ export default function PlayerPage() {
     void startFreshCode();
   }, [startFreshCode]);
 
+  const startFromSavedPlaylist = useCallback(async (): Promise<boolean> => {
+    const saved = loadLastPlaylist();
+
+    if (!saved || saved.length === 0) {
+      return false;
+    }
+
+    await Promise.all(
+      saved.map((item) =>
+        getPlayableUrl(getMediaUrl(item.file_path)).catch(() => undefined),
+      ),
+    );
+
+    signatureRef.current = makeSignature(saved);
+    setItems(saved);
+    setCurrentIndex(0);
+    setFailedItemId(null);
+    setPlaylistVersion((version) => version + 1);
+    setOffline(true);
+    setView("paired");
+
+    return true;
+  }, []);
+
   const handlePollResponse = useCallback(
     (response: PollResponse) => {
+      setOffline(false);
+
       if (response.status === "paired") {
+        saveLastPlaylist(response.items);
+        void cacheItems(response.items);
+        void pruneCache(response.items);
+
         const nextSignature = makeSignature(response.items);
 
         setScreenId(response.screen_id);
@@ -470,9 +530,16 @@ export default function PlayerPage() {
 
         const response = await pollOnce(token);
 
-        if (!cancelled && response) {
-          handlePollResponse(response);
+        if (cancelled) {
+          return;
         }
+
+        if (response) {
+          handlePollResponse(response);
+          return;
+        }
+
+        await startFromSavedPlaylist();
       } finally {
         inFlight = false;
       }
@@ -487,7 +554,13 @@ export default function PlayerPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [view, pollOnce, startFreshCode, handlePollResponse]);
+  }, [
+    view,
+    pollOnce,
+    startFreshCode,
+    startFromSavedPlaylist,
+    handlePollResponse,
+  ]);
 
   useEffect(() => {
     if (view !== "waiting") {
@@ -524,12 +597,15 @@ export default function PlayerPage() {
       return;
     }
 
-    const interval = window.setInterval(() => {
-      void pollNow();
-    }, 30000);
+    const interval = window.setInterval(
+      () => {
+        void pollNow();
+      },
+      offline ? 15000 : 30000,
+    );
 
     return () => window.clearInterval(interval);
-  }, [view, pollNow]);
+  }, [view, pollNow, offline]);
 
   useEffect(() => {
     if (view !== "paired" || !screenId) {
@@ -749,6 +825,12 @@ export default function PlayerPage() {
       : null;
   const nextImagePath = nextItem?.type === "image" ? nextItem.file_path : null;
   const nextVideoPath = nextItem?.type === "video" ? nextItem.file_path : null;
+  const currentMediaUrl = currentItem
+    ? getMediaUrl(currentItem.file_path)
+    : null;
+  const nextVideoMediaUrl = nextVideoPath ? getMediaUrl(nextVideoPath) : null;
+  const currentSrc = usePlayableUrl(currentMediaUrl);
+  const nextVideoSrc = usePlayableUrl(nextVideoMediaUrl);
 
   const advance = useCallback(
     (fromId: string) => {
@@ -812,8 +894,22 @@ export default function PlayerPage() {
       return;
     }
 
-    const image = new Image();
-    image.src = getMediaUrl(nextImagePath);
+    let cancelled = false;
+
+    void getPlayableUrl(getMediaUrl(nextImagePath))
+      .then((url) => {
+        if (cancelled) {
+          return;
+        }
+
+        const image = new Image();
+        image.src = url;
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
   }, [nextImagePath]);
 
   return (
@@ -833,18 +929,18 @@ export default function PlayerPage() {
               transition={{ duration: 0.6, ease: "easeInOut" }}
               className="absolute inset-0 flex items-center justify-center bg-black"
             >
-              {currentItem.type === "image" ? (
+              {currentItem.type === "image" && currentSrc ? (
                 <img
-                  src={getMediaUrl(currentItem.file_path)}
+                  src={currentSrc}
                   alt=""
                   aria-hidden="true"
                   draggable={false}
                   onError={() => setFailedItemId(currentItem.id)}
                   className="h-full w-full object-contain"
                 />
-              ) : (
+              ) : currentItem.type === "video" && currentSrc ? (
                 <video
-                  src={getMediaUrl(currentItem.file_path)}
+                  src={currentSrc}
                   autoPlay
                   muted
                   playsInline
@@ -855,14 +951,14 @@ export default function PlayerPage() {
                   onError={() => setFailedItemId(currentItem.id)}
                   className="h-full w-full object-contain"
                 />
-              )}
+              ) : null}
             </motion.div>
           </AnimatePresence>
 
-          {nextVideoPath ? (
+          {nextVideoPath && nextVideoSrc ? (
             <video
               key={nextVideoPath}
-              src={getMediaUrl(nextVideoPath)}
+              src={nextVideoSrc}
               muted
               playsInline
               preload="auto"

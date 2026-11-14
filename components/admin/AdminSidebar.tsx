@@ -10,6 +10,7 @@ import {
   LogOut,
   Monitor,
   Users,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -25,6 +26,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Customers", href: "/admin/customers", icon: Users },
+  { label: "Team", href: "/admin/team", icon: UsersRound },
   { label: "Leads", href: "/admin/leads", icon: Inbox },
   { label: "Screens", href: "/admin/screens", icon: Monitor },
 ];

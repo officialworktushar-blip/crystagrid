@@ -6,12 +6,21 @@ export interface AdminCustomerStats {
   company_name: string | null;
   email: string | null;
   phone: string | null;
+  manager_id: string | null;
   manager_name: string | null;
   total_screens: number;
   online_screens: number;
   media_count: number;
   storage_bytes: number;
   joined_at: string | null;
+}
+
+export interface AdminTeamMember {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  customers_count: number;
 }
 
 export interface AdminScreenRow {
@@ -148,6 +157,11 @@ export function normalizeAdminCustomerStats(
       ]),
       email: pickString(row, ["email", "user_email"]),
       phone: pickString(row, ["phone", "phone_number"]),
+      manager_id: pickString(row, [
+        "manager_id",
+        "assigned_manager_id",
+        "account_manager_id",
+      ]),
       manager_name: pickManagerName(row),
       total_screens: pickNumber(row, [
         "total_screens",
@@ -194,6 +208,54 @@ export function normalizeAdminCustomerStats(
   }
 
   return customers;
+}
+
+export function normalizeAdminTeam(data: unknown): AdminTeamMember[] {
+  const rows = Array.isArray(data) ? data : [];
+  const managers: AdminTeamMember[] = [];
+
+  for (const value of rows) {
+    const row = asRecord(value);
+
+    if (!row) {
+      continue;
+    }
+
+    const id = pickString(row, [
+      "id",
+      "manager_id",
+      "user_id",
+      "profile_id",
+    ]);
+
+    if (!id) {
+      continue;
+    }
+
+    managers.push({
+      id,
+      full_name: pickString(row, [
+        "full_name",
+        "name",
+        "display_name",
+        "manager_name",
+      ]),
+      email: pickString(row, ["email", "user_email"]),
+      phone: pickString(row, ["phone", "phone_number"]),
+      customers_count: pickNumber(row, [
+        "customers_count",
+        "customer_count",
+        "total_customers",
+        "customers",
+      ]),
+    });
+  }
+
+  return managers;
+}
+
+export function managerDisplayName(manager: AdminTeamMember): string {
+  return manager.full_name || manager.email || "Unnamed manager";
 }
 
 export function customerDisplayName(

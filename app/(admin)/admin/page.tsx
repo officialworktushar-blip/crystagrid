@@ -6,6 +6,8 @@ import {
   Inbox,
   Monitor,
   Users,
+  UsersRound,
+  UserX,
   Wifi,
   type LucideIcon,
 } from "lucide-react";
@@ -16,6 +18,7 @@ import {
   formatStorage,
   joinedTimestamp,
   normalizeAdminCustomerStats,
+  normalizeAdminTeam,
 } from "@/lib/admin";
 import {
   formatRelativeTime,
@@ -68,18 +71,21 @@ export default async function AdminOverviewPage() {
   const supabase = await createClient();
   const now = Date.now();
 
-  const [statsResult, screensResult, leadsResult] = await Promise.all([
-    supabase.rpc("admin_customer_stats"),
-    supabase
-      .from("screens")
-      .select("id, customer_id, name, last_seen")
-      .not("last_seen", "is", null)
-      .order("last_seen", { ascending: false })
-      .limit(8),
-    supabase.from("leads").select("id", { count: "exact", head: true }),
-  ]);
+  const [statsResult, teamResult, screensResult, leadsResult] =
+    await Promise.all([
+      supabase.rpc("admin_customer_stats"),
+      supabase.rpc("admin_list_team"),
+      supabase
+        .from("screens")
+        .select("id, customer_id, name, last_seen")
+        .not("last_seen", "is", null)
+        .order("last_seen", { ascending: false })
+        .limit(8),
+      supabase.from("leads").select("id", { count: "exact", head: true }),
+    ]);
 
   const customers = normalizeAdminCustomerStats(statsResult.data);
+  const managers = normalizeAdminTeam(teamResult.data);
   const customerById = new Map(
     customers.map((customer) => [customer.customer_id, customer]),
   );
@@ -107,6 +113,9 @@ export default async function AdminOverviewPage() {
     (total, customer) => total + customer.storage_bytes,
     0,
   );
+  const customersWithoutManager = customers.filter(
+    (customer) => !customer.manager_id,
+  ).length;
 
   const statCards: AdminStatCardProps[] = [
     {
@@ -114,6 +123,18 @@ export default async function AdminOverviewPage() {
       value: String(customers.length),
       icon: Users,
       accent: "text-violet-300",
+    },
+    {
+      label: "Account managers",
+      value: String(managers.length),
+      icon: UsersRound,
+      accent: "text-cyan-300",
+    },
+    {
+      label: "Customers without a manager",
+      value: String(customersWithoutManager),
+      icon: UserX,
+      accent: "text-rose-300",
     },
     {
       label: "Leads",
@@ -147,9 +168,12 @@ export default async function AdminOverviewPage() {
     },
   ];
 
-  const hasError = Boolean(
-    statsResult.error || screensResult.error || leadsResult.error,
-  );
+  const loadErrorMessage =
+    statsResult.error?.message ??
+    teamResult.error?.message ??
+    screensResult.error?.message ??
+    leadsResult.error?.message ??
+    null;
 
   return (
     <div className="space-y-8">
@@ -161,20 +185,20 @@ export default async function AdminOverviewPage() {
           Overview
         </h1>
         <p className="mt-2 text-sm text-body">
-          Monitor customers, screens, and storage across Crystagrid.
+          Monitor customers, managers, screens, and storage across Crystagrid.
         </p>
       </div>
 
-      {hasError ? (
+      {loadErrorMessage ? (
         <p
           role="alert"
           className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
         >
-          Some admin totals could not be loaded. Refresh to try again.
+          Some admin totals could not be loaded. {loadErrorMessage}
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {statCards.map((card) => (
           <AdminStatCard key={card.label} {...card} />
         ))}

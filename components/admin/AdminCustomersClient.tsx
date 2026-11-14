@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, Search } from "lucide-react";
+import AdminManagerSelect from "@/components/admin/AdminManagerSelect";
 import Card from "@/components/ui/Card";
 import {
   customerDisplayName,
   formatAdminDate,
   formatStorage,
   joinedTimestamp,
+  managerDisplayName,
   type AdminCustomerStats,
+  type AdminTeamMember,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -43,13 +46,22 @@ function ScreensCount({
 
 export default function AdminCustomersClient({
   customers,
+  managers,
+  initialManagerId,
   loadError,
+  managersError,
 }: {
   customers: AdminCustomerStats[];
+  managers: AdminTeamMember[];
+  initialManagerId: string | null;
   loadError: string | null;
+  managersError: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("joined-desc");
+  const [managerFilter, setManagerFilter] = useState(
+    initialManagerId ?? "all",
+  );
 
   const visibleCustomers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -61,7 +73,16 @@ export default function AdminCustomersClient({
         )
       : customers;
 
-    return [...filtered].sort((a, b) => {
+    const managerFiltered =
+      managerFilter === "all"
+        ? filtered
+        : managerFilter === "unassigned"
+          ? filtered.filter((customer) => !customer.manager_id)
+          : filtered.filter(
+              (customer) => customer.manager_id === managerFilter,
+            );
+
+    return [...managerFiltered].sort((a, b) => {
       switch (sort) {
         case "joined-asc":
           return joinedTimestamp(a) - joinedTimestamp(b);
@@ -74,7 +95,12 @@ export default function AdminCustomersClient({
           return joinedTimestamp(b) - joinedTimestamp(a);
       }
     });
-  }, [customers, query, sort]);
+  }, [customers, managerFilter, query, sort]);
+
+  const selectedManagerName =
+    managerFilter !== "all" && managerFilter !== "unassigned"
+      ? managers.find((manager) => manager.id === managerFilter)
+      : null;
 
   return (
     <div className="space-y-4">
@@ -94,22 +120,47 @@ export default function AdminCustomersClient({
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="customer-sort" className="text-xs text-muted">
-            Sort
-          </label>
-          <select
-            id="customer-sort"
-            value={sort}
-            onChange={(event) => setSort(event.target.value as SortKey)}
-            className={selectClass}
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="customer-manager-filter"
+              className="text-xs text-muted"
+            >
+              Manager
+            </label>
+            <select
+              id="customer-manager-filter"
+              value={managerFilter}
+              onChange={(event) => setManagerFilter(event.target.value)}
+              className={selectClass}
+            >
+              <option value="all">All customers</option>
+              <option value="unassigned">Unassigned only</option>
+              {managers.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {managerDisplayName(manager)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="customer-sort" className="text-xs text-muted">
+              Sort
+            </label>
+            <select
+              id="customer-sort"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as SortKey)}
+              className={selectClass}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -122,23 +173,36 @@ export default function AdminCustomersClient({
         </p>
       ) : null}
 
+      {managersError ? (
+        <p
+          role="alert"
+          className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
+        >
+          Account managers could not be loaded. {managersError}
+        </p>
+      ) : null}
+
       {visibleCustomers.length === 0 ? (
         <Card className="p-8 text-center hover:border-white/10 hover:shadow-none">
           <p className="text-sm font-medium text-white">
             {customers.length === 0
               ? "No customers found."
-              : "No customers match your search."}
+              : selectedManagerName
+                ? `No customers assigned to ${managerDisplayName(
+                    selectedManagerName,
+                  )}.`
+                : "No customers match your filters."}
           </p>
           <p className="mt-1 text-sm text-body">
             {customers.length === 0
               ? "Customer stats will appear here once accounts are created."
-              : "Try a different name, company, or email."}
+              : "Try a different search or manager filter."}
           </p>
         </Card>
       ) : (
         <Card className="overflow-hidden p-0 hover:border-white/10 hover:shadow-none">
           <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[72rem] text-left text-sm">
+            <table className="w-full min-w-[84rem] text-left text-sm">
               <thead className="border-b border-white/5 bg-white/[0.02] text-xs uppercase tracking-[0.12em] text-muted">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
@@ -152,6 +216,9 @@ export default function AdminCustomersClient({
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Phone
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Manager
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Screens{" "}
@@ -197,6 +264,14 @@ export default function AdminCustomersClient({
                     <td className="px-4 py-3.5 text-white/70">
                       {customer.phone || "—"}
                     </td>
+                    <td className="relative z-10 min-w-[13rem] px-4 py-3.5">
+                      <AdminManagerSelect
+                        customerId={customer.customer_id}
+                        managerId={customer.manager_id}
+                        managers={managers}
+                        className="w-52"
+                      />
+                    </td>
                     <td className="px-4 py-3.5">
                       <ScreensCount
                         online={customer.online_screens}
@@ -220,13 +295,12 @@ export default function AdminCustomersClient({
 
           <div className="divide-y divide-white/5 lg:hidden">
             {visibleCustomers.map((customer) => (
-              <Link
-                key={customer.customer_id}
-                href={`/admin/customers/${customer.customer_id}`}
-                className="block p-4 transition duration-200 hover:bg-white/[0.03] focus-visible:bg-white/[0.03] focus-visible:outline-none"
-              >
+              <div key={customer.customer_id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <Link
+                    href={`/admin/customers/${customer.customer_id}`}
+                    className="min-w-0 flex-1 rounded-sm transition duration-200 hover:text-brand-sky focus-visible:text-brand-sky focus-visible:outline-none"
+                  >
                     <p className="truncate text-sm font-semibold text-white">
                       {customerDisplayName(customer)}
                     </p>
@@ -236,11 +310,14 @@ export default function AdminCustomersClient({
                     <p className="mt-0.5 truncate text-xs text-muted">
                       {customer.email || "No email"}
                     </p>
-                  </div>
-                  <ArrowUpRight
-                    aria-hidden="true"
-                    className="h-4 w-4 shrink-0 text-white/30"
-                  />
+                  </Link>
+                  <Link
+                    href={`/admin/customers/${customer.customer_id}`}
+                    aria-label={`Open ${customerDisplayName(customer)}`}
+                    className="rounded-full p-1 text-white/30 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                  >
+                    <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+                  </Link>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
@@ -272,8 +349,19 @@ export default function AdminCustomersClient({
                       {formatAdminDate(customer.joined_at)}
                     </dd>
                   </div>
+                  <div className="col-span-2">
+                    <dt className="text-muted">Manager</dt>
+                    <dd className="mt-1">
+                      <AdminManagerSelect
+                        customerId={customer.customer_id}
+                        managerId={customer.manager_id}
+                        managers={managers}
+                        className="w-full sm:max-w-xs"
+                      />
+                    </dd>
+                  </div>
                 </dl>
-              </Link>
+              </div>
             ))}
           </div>
         </Card>

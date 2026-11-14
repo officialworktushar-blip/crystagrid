@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Settings2 } from "lucide-react";
+import AdminManagerSelect from "@/components/admin/AdminManagerSelect";
 import DeleteScreenButton from "@/components/admin/DeleteScreenButton";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Card from "@/components/ui/Card";
@@ -10,7 +11,9 @@ import {
   formatAdminDate,
   formatFileSize,
   formatStorage,
+  managerDisplayName,
   normalizeAdminCustomerStats,
+  normalizeAdminTeam,
 } from "@/lib/admin";
 import { getMediaUrl } from "@/lib/media";
 import {
@@ -34,14 +37,15 @@ export default async function AdminCustomerDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: statsData, error: statsError } = await supabase.rpc(
-    "admin_customer_stats",
-  );
-  const customer = normalizeAdminCustomerStats(statsData).find(
+  const [statsResult, teamResult] = await Promise.all([
+    supabase.rpc("admin_customer_stats"),
+    supabase.rpc("admin_list_team"),
+  ]);
+  const customer = normalizeAdminCustomerStats(statsResult.data).find(
     (item) => item.customer_id === id,
   );
 
-  if (statsError) {
+  if (statsResult.error) {
     return (
       <div className="space-y-6">
         <Link
@@ -55,7 +59,7 @@ export default async function AdminCustomerDetailPage({
           role="alert"
           className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
         >
-          Customer details could not be loaded. {statsError.message}
+          Customer details could not be loaded. {statsResult.error.message}
         </p>
       </div>
     );
@@ -64,6 +68,16 @@ export default async function AdminCustomerDetailPage({
   if (!customer) {
     notFound();
   }
+
+  const managers = normalizeAdminTeam(teamResult.data);
+  const managersError = teamResult.error?.message ?? null;
+  const assignedManager = managers.find(
+    (manager) => manager.id === customer.manager_id,
+  );
+  const currentManagerName =
+    customer.manager_name ||
+    (assignedManager ? managerDisplayName(assignedManager) : null) ||
+    "Unassigned";
 
   const [screensResult, playlistsResult, mediaResult] = await Promise.all([
     supabase
@@ -186,13 +200,37 @@ export default async function AdminCustomerDetailPage({
             </div>
           </div>
 
-          <Link
-            href={`/manage/${customer.customer_id}`}
-            className="brand-gradient inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-          >
-            <Settings2 aria-hidden="true" className="h-4 w-4" />
-            Manage this customer
-          </Link>
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Account manager
+              </p>
+              <p className="mt-1 truncate text-sm font-medium text-white">
+                {currentManagerName}
+              </p>
+
+              {managersError ? (
+                <p className="mt-2 max-w-56 text-xs text-red-300">
+                  Managers could not be loaded. {managersError}
+                </p>
+              ) : (
+                <AdminManagerSelect
+                  customerId={customer.customer_id}
+                  managerId={customer.manager_id}
+                  managers={managers}
+                  className="mt-2 w-full sm:w-56"
+                />
+              )}
+            </div>
+
+            <Link
+              href={`/manage/${customer.customer_id}`}
+              className="brand-gradient inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+            >
+              <Settings2 aria-hidden="true" className="h-4 w-4" />
+              Manage this customer
+            </Link>
+          </div>
         </div>
       </div>
 

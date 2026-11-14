@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings2 } from "lucide-react";
 import DeleteScreenButton from "@/components/admin/DeleteScreenButton";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Card from "@/components/ui/Card";
@@ -171,18 +171,28 @@ export default async function AdminCustomerDetailPage({
           Customers
         </Link>
 
-        <div className="mt-5 flex items-center gap-4">
-          <div className="brand-gradient flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-brand">
-            {customerInitials(customer)}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="brand-gradient flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white shadow-brand">
+              {customerInitials(customer)}
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                {customerDisplayName(customer)}
+              </h1>
+              <p className="mt-1 truncate text-sm text-body">
+                {customer.company_name || "Customer account"}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              {customerDisplayName(customer)}
-            </h1>
-            <p className="mt-1 truncate text-sm text-body">
-              {customer.company_name || "Customer account"}
-            </p>
-          </div>
+
+          <Link
+            href={`/manage/${customer.customer_id}`}
+            className="brand-gradient inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+          >
+            <Settings2 aria-hidden="true" className="h-4 w-4" />
+            Manage this customer
+          </Link>
         </div>
       </div>
 

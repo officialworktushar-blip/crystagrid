@@ -25,6 +25,15 @@ export default async function DashboardLayout({
     .maybeSingle();
 
   const profile = (profileData ?? null) as Profile | null;
+
+  if (profile?.role === "admin") {
+    redirect("/admin");
+  }
+
+  if (profile?.role === "manager") {
+    redirect("/manage");
+  }
+
   const metadataName =
     typeof user.user_metadata?.full_name === "string"
       ? user.user_metadata.full_name

@@ -6,6 +6,7 @@ export interface AdminCustomerStats {
   company_name: string | null;
   email: string | null;
   phone: string | null;
+  manager_name: string | null;
   total_screens: number;
   online_screens: number;
   media_count: number;
@@ -71,6 +72,43 @@ function pickNumber(row: UnknownRecord, keys: string[]): number {
   return 0;
 }
 
+function pickManagerName(row: UnknownRecord): string | null {
+  const direct = pickString(row, [
+    "manager_name",
+    "manager_full_name",
+    "manager_display_name",
+    "assigned_manager_name",
+    "account_manager_name",
+    "manager",
+    "manager_email",
+  ]);
+
+  if (direct) {
+    return direct;
+  }
+
+  for (const key of ["manager", "account_manager", "assigned_manager"]) {
+    const manager = asRecord(row[key]);
+
+    if (!manager) {
+      continue;
+    }
+
+    const name = pickString(manager, [
+      "full_name",
+      "name",
+      "display_name",
+      "email",
+    ]);
+
+    if (name) {
+      return name;
+    }
+  }
+
+  return null;
+}
+
 export function normalizeAdminCustomerStats(
   data: unknown,
 ): AdminCustomerStats[] {
@@ -110,6 +148,7 @@ export function normalizeAdminCustomerStats(
       ]),
       email: pickString(row, ["email", "user_email"]),
       phone: pickString(row, ["phone", "phone_number"]),
+      manager_name: pickManagerName(row),
       total_screens: pickNumber(row, [
         "total_screens",
         "screen_count",

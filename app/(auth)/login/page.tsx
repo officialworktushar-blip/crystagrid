@@ -46,6 +46,8 @@ export default function LoginPage() {
 
         if (profile?.role === "admin") {
           destination = "/admin";
+        } else if (profile?.role === "manager") {
+          destination = "/manage";
         }
       }
 

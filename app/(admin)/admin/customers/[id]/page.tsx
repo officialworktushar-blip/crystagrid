@@ -4,6 +4,7 @@ import { ArrowLeft, Settings2 } from "lucide-react";
 import AdminManagerSelect from "@/components/admin/AdminManagerSelect";
 import DeleteScreenButton from "@/components/admin/DeleteScreenButton";
 import StatusBadge from "@/components/dashboard/StatusBadge";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import {
   customerDisplayName,
@@ -223,13 +224,45 @@ export default async function AdminCustomerDetailPage({
               )}
             </div>
 
-            <Link
-              href={`/manage/${customer.customer_id}`}
-              className="brand-gradient inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-            >
-              <Settings2 aria-hidden="true" className="h-4 w-4" />
-              Manage this customer
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/manage/${customer.customer_id}`}
+                className="brand-gradient inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+              >
+                <Settings2 aria-hidden="true" className="h-4 w-4" />
+                Manage this customer
+              </Link>
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                className="h-10 px-4"
+              >
+                <Link href={`/manage/${customer.customer_id}/screens`}>
+                  Screens
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                className="h-10 px-4"
+              >
+                <Link href={`/manage/${customer.customer_id}/media`}>
+                  Media
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                className="h-10 px-4"
+              >
+                <Link href={`/manage/${customer.customer_id}/playlists`}>
+                  Playlists
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>

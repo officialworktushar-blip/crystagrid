@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, Search } from "lucide-react";
 import AdminManagerSelect from "@/components/admin/AdminManagerSelect";
+import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import {
   customerDisplayName,
@@ -202,7 +203,7 @@ export default function AdminCustomersClient({
       ) : (
         <Card className="overflow-hidden p-0 hover:border-white/10 hover:shadow-none">
           <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[84rem] text-left text-sm">
+            <table className="w-full min-w-[88rem] text-left text-sm">
               <thead className="border-b border-white/5 bg-white/[0.02] text-xs uppercase tracking-[0.12em] text-muted">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
@@ -234,6 +235,9 @@ export default function AdminCustomersClient({
                   </th>
                   <th scope="col" className="px-5 py-3 font-semibold">
                     Joined
+                  </th>
+                  <th scope="col" className="px-5 py-3 text-right font-semibold">
+                    Manage
                   </th>
                 </tr>
               </thead>
@@ -286,6 +290,39 @@ export default function AdminCustomersClient({
                     </td>
                     <td className="px-5 py-3.5 text-white/60">
                       {formatAdminDate(customer.joined_at)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="relative z-10 flex flex-col items-end gap-1.5">
+                        <Button
+                          asChild
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          <Link href={`/manage/${customer.customer_id}`}>
+                            Manage
+                          </Link>
+                        </Button>
+                        <div className="flex items-center gap-2 text-xs">
+                          <Link
+                            href={`/manage/${customer.customer_id}/screens`}
+                            className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          >
+                            Screens
+                          </Link>
+                          <Link
+                            href={`/manage/${customer.customer_id}/media`}
+                            className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          >
+                            Media
+                          </Link>
+                          <Link
+                            href={`/manage/${customer.customer_id}/playlists`}
+                            className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          >
+                            Playlists
+                          </Link>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -361,6 +398,30 @@ export default function AdminCustomersClient({
                     </dd>
                   </div>
                 </dl>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Button asChild size="sm" className="h-8 px-3 text-xs">
+                    <Link href={`/manage/${customer.customer_id}`}>Manage</Link>
+                  </Button>
+                  <Link
+                    href={`/manage/${customer.customer_id}/screens`}
+                    className="rounded-sm px-1 text-xs font-medium text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                  >
+                    Screens
+                  </Link>
+                  <Link
+                    href={`/manage/${customer.customer_id}/media`}
+                    className="rounded-sm px-1 text-xs font-medium text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                  >
+                    Media
+                  </Link>
+                  <Link
+                    href={`/manage/${customer.customer_id}/playlists`}
+                    className="rounded-sm px-1 text-xs font-medium text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                  >
+                    Playlists
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

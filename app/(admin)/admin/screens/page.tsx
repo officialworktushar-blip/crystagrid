@@ -1,5 +1,6 @@
-import AdminScreensClient from "@/components/admin/AdminScreensClient";
-import type { AdminScreenRow } from "@/lib/admin";
+import AdminScreensClient, {
+  type AdminScreenRowWithCustomer,
+} from "@/components/admin/AdminScreensClient";
 import {
   formatRelativeTime,
   getScreenStatus,
@@ -24,7 +25,7 @@ export default async function AdminScreensPage() {
     .order("last_seen", { ascending: false, nullsFirst: false });
 
   const now = Date.now();
-  const screens: AdminScreenRow[] = (
+  const screens: AdminScreenRowWithCustomer[] = (
     (data ?? []) as unknown as RawAdminScreen[]
   ).map((screen) => {
     const profile = Array.isArray(screen.profiles)
@@ -35,6 +36,7 @@ export default async function AdminScreensPage() {
 
     return {
       id: screen.id,
+      customer_id: screen.customer_id,
       name: screen.name,
       owner_name: fullName ?? companyName ?? "Unknown customer",
       owner_company: fullName ? companyName : null,

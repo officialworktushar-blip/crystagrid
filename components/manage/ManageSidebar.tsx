@@ -120,15 +120,24 @@ export default function ManageSidebar({
         </div>
 
         <div className="border-b border-white/5 px-3 py-4">
+          <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+            Managing customer
+          </p>
           <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-3">
             <span className="brand-gradient flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-brand">
               <Building2 aria-hidden="true" className="h-4 w-4" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
+              <p
+                className="truncate text-sm font-semibold text-white"
+                title={customer.name}
+              >
                 {customer.name}
               </p>
-              <p className="truncate text-xs text-body">
+              <p
+                className="truncate text-xs text-body"
+                title={customer.company ?? undefined}
+              >
                 {customer.company || "Customer account"}
               </p>
             </div>

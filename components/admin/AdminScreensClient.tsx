@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import DeleteScreenButton from "@/components/admin/DeleteScreenButton";
@@ -10,6 +11,10 @@ import {
   type AdminScreenRow,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
+
+export type AdminScreenRowWithCustomer = AdminScreenRow & {
+  customer_id: string;
+};
 
 type ScreenFilter = "all" | "online" | "offline" | "pending";
 
@@ -24,7 +29,7 @@ export default function AdminScreensClient({
   screens,
   loadError,
 }: {
-  screens: AdminScreenRow[];
+  screens: AdminScreenRowWithCustomer[];
   loadError: string | null;
 }) {
   const [query, setQuery] = useState("");
@@ -173,9 +178,12 @@ export default function AdminScreensClient({
                       </p>
                     </td>
                     <td className="max-w-[16rem] px-4 py-3.5">
-                      <p className="truncate text-white/75">
+                      <Link
+                        href={`/manage/${screen.customer_id}`}
+                        className="block truncate rounded-sm text-white/75 transition duration-200 hover:text-brand-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                      >
                         {screen.owner_name}
-                      </p>
+                      </Link>
                       {screen.owner_company ? (
                         <p className="mt-0.5 truncate text-xs text-muted">
                           {screen.owner_company}
@@ -192,11 +200,19 @@ export default function AdminScreensClient({
                       {formatAdminDate(screen.created_at)}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <DeleteScreenButton
-                        screenId={screen.id}
-                        screenName={screen.name}
-                        className="items-end"
-                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/manage/${screen.customer_id}/screens`}
+                          className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition duration-200 hover:border-sky-400/30 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                        >
+                          Manage
+                        </Link>
+                        <DeleteScreenButton
+                          screenId={screen.id}
+                          screenName={screen.name}
+                          className="items-end"
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -213,7 +229,12 @@ export default function AdminScreensClient({
                       {screen.name}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-body">
-                      {screen.owner_name}
+                      <Link
+                        href={`/manage/${screen.customer_id}`}
+                        className="rounded-sm transition duration-200 hover:text-brand-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                      >
+                        {screen.owner_name}
+                      </Link>
                       {screen.owner_company
                         ? ` · ${screen.owner_company}`
                         : ""}
@@ -237,10 +258,18 @@ export default function AdminScreensClient({
                       </dd>
                     </div>
                   </dl>
-                  <DeleteScreenButton
-                    screenId={screen.id}
-                    screenName={screen.name}
-                  />
+                  <div className="flex flex-col items-end gap-1">
+                    <Link
+                      href={`/manage/${screen.customer_id}/screens`}
+                      className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition duration-200 hover:border-sky-400/30 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                    >
+                      Manage
+                    </Link>
+                    <DeleteScreenButton
+                      screenId={screen.id}
+                      screenName={screen.name}
+                    />
+                  </div>
                 </div>
               </div>
             ))}

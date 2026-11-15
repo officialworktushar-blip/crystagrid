@@ -58,7 +58,9 @@ export default async function ScreensPage() {
   const [screensResult, playlistsResult] = await Promise.all([
     supabase
       .from("screens")
-      .select("id, customer_id, name, status, location, last_seen, created_at")
+      .select(
+        "id, customer_id, name, status, location, last_seen, created_at, display_fit, display_rotation, display_flip_h, display_flip_v, display_width, display_height, display_left, display_top",
+      )
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false }),
     supabase

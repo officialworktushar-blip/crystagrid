@@ -22,6 +22,7 @@ import {
   Loader2,
   MapPin,
   Monitor,
+  MonitorCog,
   Pencil,
   Plus,
   RefreshCw,
@@ -30,8 +31,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import DisplaySettingsDialog from "@/components/dashboard/DisplaySettingsDialog";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
+import { displaySummary, screenToDisplay } from "@/lib/display";
 import { getMediaUrl } from "@/lib/media";
 import { notifyChannel, notifyScreens } from "@/lib/realtime";
 import { getScreenStatus } from "@/lib/screens";
@@ -251,6 +254,7 @@ export default function ScreensClient({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [editingScreen, setEditingScreen] = useState<Screen | null>(null);
+  const [displayScreen, setDisplayScreen] = useState<Screen | null>(null);
   const [editName, setEditName] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -358,6 +362,10 @@ export default function ScreensClient({
     setError(null);
     router.refresh();
   }, [router]);
+
+  const closeDisplayModal = useCallback(() => {
+    setDisplayScreen(null);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -753,6 +761,9 @@ export default function ScreensClient({
               const assignedPlaylistName = assignment
                 ? (playlistNameById.get(assignment.playlist_id) ?? "Playlist")
                 : null;
+              const displayLabel = canEdit
+                ? displaySummary(screenToDisplay(screen))
+                : "";
 
               return (
               <li
@@ -763,9 +774,20 @@ export default function ScreensClient({
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-brand-sky">
                     <Monitor aria-hidden="true" className="h-5 w-5" />
                   </span>
-                  <p className="truncate text-sm font-medium text-white">
-                    {screen.name}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">
+                      {screen.name}
+                    </p>
+                    {displayLabel ? (
+                      <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold text-sky-100">
+                        <MonitorCog
+                          aria-hidden="true"
+                          className="h-3 w-3 shrink-0"
+                        />
+                        <span className="truncate">{displayLabel}</span>
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between gap-3 md:block">
@@ -847,6 +869,15 @@ export default function ScreensClient({
 
                 {canEdit ? (
                   <div className="flex flex-wrap items-center gap-2 md:col-span-4">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setDisplayScreen(screen)}
+                      className="gap-2"
+                    >
+                      <MonitorCog aria-hidden="true" className="h-3.5 w-3.5" />
+                      Display
+                    </Button>
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1173,6 +1204,19 @@ export default function ScreensClient({
             </form>
           </div>
         </div>
+      ) : null}
+
+      {displayScreen && canEdit ? (
+        <DisplaySettingsDialog
+          screen={displayScreen}
+          siblingsCount={
+            screens.filter(
+              (item) => item.customer_id === displayScreen.customer_id,
+            ).length
+          }
+          onClose={closeDisplayModal}
+          onSaved={() => router.refresh()}
+        />
       ) : null}
     </div>
   );

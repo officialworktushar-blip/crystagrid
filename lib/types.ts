@@ -2,6 +2,32 @@ export type UserRole = "admin" | "manager" | "customer";
 
 export type ScreenStatus = "online" | "offline" | "pending";
 
+export type DisplayFit = "fit" | "fill" | "stretch";
+
+export type DisplayRotation = 0 | 90 | 180 | 270;
+
+export interface DisplaySettings {
+  fit: DisplayFit;
+  rotation: DisplayRotation;
+  flipH: boolean;
+  flipV: boolean;
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+}
+
+export const DEFAULT_DISPLAY: DisplaySettings = {
+  fit: "fit",
+  rotation: 0,
+  flipH: false,
+  flipV: false,
+  width: 100,
+  height: 100,
+  left: 0,
+  top: 0,
+};
+
 export interface Profile {
   id: string;
   full_name: string | null;
@@ -19,6 +45,14 @@ export interface Screen {
   last_seen: string | null;
   created_at: string;
   updated_at?: string | null;
+  display_fit?: DisplayFit | null;
+  display_rotation?: DisplayRotation | null;
+  display_flip_h?: boolean | null;
+  display_flip_v?: boolean | null;
+  display_width?: number | null;
+  display_height?: number | null;
+  display_left?: number | null;
+  display_top?: number | null;
 }
 
 export interface PairingCode {

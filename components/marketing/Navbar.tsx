@@ -123,12 +123,11 @@ export default function Navbar() {
           <Image
             src="/logo.webp"
             alt=""
-            width={36}
-            height={36}
+            width={160}
+            height={59}
             loading="eager"
-            className="h-9 w-9 shrink-0 rounded-xl object-contain"
+            className="h-14 w-auto shrink-0 object-contain sm:h-16"
           />
-          Crystagrid
         </Link>
 
         <div className="hidden flex-1 items-center justify-center lg:flex">

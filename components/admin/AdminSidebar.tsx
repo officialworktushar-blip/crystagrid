@@ -140,12 +140,11 @@ export default function AdminSidebar({
             <Image
               src="/logo.webp"
               alt=""
-              width={32}
-              height={32}
+              width={128}
+              height={47}
               loading="eager"
-              className="h-8 w-8 shrink-0 rounded-lg object-contain"
+              className="h-12 w-auto max-w-36 shrink-0 object-contain"
             />
-            <span className="truncate">Crystagrid</span>
             <span className="shrink-0 rounded-full border border-sky-400/25 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.16em] text-sky-200">
               ADMIN
             </span>

@@ -27,11 +27,10 @@ export default function Footer() {
               <Image
                 src="/logo.webp"
                 alt=""
-                width={32}
-                height={32}
-                className="h-8 w-8 shrink-0 rounded-lg object-contain"
+                width={128}
+                height={47}
+                className="h-12 w-auto max-w-36 shrink-0 object-contain"
               />
-              Crystagrid
             </Link>
             <p className="mt-4 text-sm leading-6 text-body">
               Your digital screen network partner.

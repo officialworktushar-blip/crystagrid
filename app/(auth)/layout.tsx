@@ -22,12 +22,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <Image
               src="/logo.webp"
               alt=""
-              width={40}
-              height={40}
+              width={192}
+              height={70}
               loading="eager"
-              className="h-10 w-10 shrink-0 rounded-xl object-contain"
+              className="h-20 w-auto max-w-[70vw] shrink-0 object-contain"
             />
-            Crystagrid
           </Link>
         </div>
 

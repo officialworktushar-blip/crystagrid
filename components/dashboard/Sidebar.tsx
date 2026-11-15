@@ -100,12 +100,11 @@ export default function Sidebar({
               <Image
                 src="/logo.webp"
                 alt=""
-                width={32}
-                height={32}
+                width={128}
+                height={47}
                 loading="eager"
-                className="h-8 w-8 shrink-0 rounded-lg object-contain"
+                className="h-12 w-auto max-w-36 shrink-0 object-contain"
               />
-              Crystagrid
             </Link>
 
             <span className="ml-10 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200">

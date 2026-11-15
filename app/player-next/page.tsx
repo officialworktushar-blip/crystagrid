@@ -234,15 +234,12 @@ function BrandLogo() {
     <div className="flex items-center gap-3">
       <NextImage
         src="/logo.webp"
-        alt=""
-        width={48}
-        height={48}
+        alt="Crystagrid"
+        width={320}
+        height={117}
         loading="eager"
-        className="h-12 w-12 shrink-0 rounded-2xl object-contain"
+        className="h-24 w-auto max-w-[82vw] shrink-0 object-contain sm:h-28 md:h-32"
       />
-      <span className="text-2xl font-bold tracking-tight text-white">
-        Crystagrid
-      </span>
     </div>
   );
 }

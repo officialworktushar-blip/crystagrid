@@ -100,12 +100,11 @@ export default function ManageSidebar({
             <Image
               src="/logo.webp"
               alt=""
-              width={32}
-              height={32}
+              width={128}
+              height={47}
               loading="eager"
-              className="h-8 w-8 shrink-0 rounded-lg object-contain"
+              className="h-12 w-auto max-w-36 shrink-0 object-contain"
             />
-            <span className="truncate">Crystagrid</span>
           </Link>
 
           <button

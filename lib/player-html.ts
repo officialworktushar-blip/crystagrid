@@ -13,10 +13,15 @@ export function buildPlayerHtml(
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
 body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
 #pairScreen, #emptyScreen { display: none; position: absolute; top: 50%; left: 50%; width: 90%; text-align: center; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); }
-#stage { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
+#stage { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+#display-box { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+#display-canvas { position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; -webkit-transform: translate(-50%, -50%); transform: translate(-50%, -50%); -webkit-transform-origin: 50% 50%; transform-origin: 50% 50%; }
+#media { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 #layerA, #layerB { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; opacity: 0; -webkit-transition: opacity 0.6s; transition: opacity 0.6s; }
 #debug { display: none; position: fixed; top: 0; left: 0; z-index: 9999; background: rgba(0, 0, 0, 0.85); color: #fff; font-family: monospace; font-size: 12px; line-height: 1.35; padding: 8px; margin: 0; max-width: 95%; white-space: pre-wrap; pointer-events: none; }
 #debugHit { position: fixed; right: 0; bottom: 0; width: 100px; height: 100px; z-index: 9998; background: transparent; }
+#displayHit { position: fixed; top: 0; right: 0; width: 100px; height: 100px; z-index: 10000; background: transparent; }
+#displayToast { display: none; position: fixed; left: 50%; bottom: 32px; z-index: 10001; background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.3; padding: 12px 18px; border-radius: 12px; text-align: center; max-width: 90%; -webkit-transform: translateX(-50%); transform: translateX(-50%); pointer-events: none; }
 </style>
 </head>
 <body>
@@ -34,11 +39,19 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   <div id="emptyError" style="display: none; color: #6b7280; font-size: 2.5vmin; margin-top: 2vmin;"></div>
 </div>
 <div id="stage">
-  <div id="layerA"></div>
-  <div id="layerB"></div>
+  <div id="display-box">
+    <div id="display-canvas">
+      <div id="media">
+        <div id="layerA"></div>
+        <div id="layerB"></div>
+      </div>
+    </div>
+  </div>
 </div>
 <div id="debug"></div>
 <div id="debugHit"></div>
+<div id="displayHit"></div>
+<div id="displayToast"></div>
 <script>
 (function () {
   "use strict";
@@ -50,11 +63,23 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   var CODE_KEY = "crystagrid_player_code";
   var EXPIRES_KEY = "crystagrid_player_expires_at";
   var PLAYLIST_KEY = "crystagrid_last_playlist";
+  var DISPLAY_KEY = "crystagrid_display";
+  var DISPLAY_OFF_KEY = "crystagrid_display_off";
   var VERSION_RELOAD_KEY = "crystagrid_player_version_reload";
   var VERSION_CHECK_INTERVAL_MS = 60000;
   var VERSION_RELOAD_COOLDOWN_MS = 300000;
   var versionReloadAt = 0;
   var NEWLINE = String.fromCharCode(10);
+  var DEFAULT_DISPLAY = {
+    fit: "fit",
+    rotation: 0,
+    flip_h: false,
+    flip_v: false,
+    width: 100,
+    height: 100,
+    left: 0,
+    top: 0
+  };
 
   var pairScreen = document.getElementById("pairScreen");
   var emptyScreen = document.getElementById("emptyScreen");
@@ -66,6 +91,10 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   var emptyError = document.getElementById("emptyError");
   var debugPanel = document.getElementById("debug");
   var debugHit = document.getElementById("debugHit");
+  var displayBox = document.getElementById("display-box");
+  var displayCanvas = document.getElementById("display-canvas");
+  var displayHit = document.getElementById("displayHit");
+  var displayToast = document.getElementById("displayToast");
   var layerA = document.getElementById("layerA");
   var layerB = document.getElementById("layerB");
 
@@ -95,6 +124,22 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   var lastError = null;
   var debugOn = false;
   var tapTimes = [];
+  var currentDisplay = normalizeDisplay(null);
+  var lastDisplay = normalizeDisplay(null);
+  var displayOff = false;
+  var displayTapTimes = [];
+  var displayResizeTimer = null;
+  var displayToastTimer = null;
+  var lastDisplayLayout = {
+    frameWidth: 0,
+    frameHeight: 0,
+    boxLeft: 0,
+    boxTop: 0,
+    boxWidth: 0,
+    boxHeight: 0,
+    canvasWidth: 0,
+    canvasHeight: 0
+  };
 
   function storageGet(key) {
     try {
@@ -143,6 +188,182 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
       }
       window.sessionStorage.setItem(key, value);
     } catch (e) {}
+  }
+
+  function readDisplayNumber(value, fallback, minimum, maximum) {
+    if (typeof value !== "number" || !isFinite(value)) {
+      return fallback;
+    }
+    var rounded = Math.round(value);
+    if (rounded < minimum) {
+      rounded = minimum;
+    }
+    if (rounded > maximum) {
+      rounded = maximum;
+    }
+    return rounded;
+  }
+
+  function normalizeDisplay(value) {
+    if (!value || typeof value !== "object" || value instanceof Array) {
+      value = {};
+    }
+    var fit =
+      value.fit === "fill" || value.fit === "stretch" || value.fit === "fit" ? value.fit : DEFAULT_DISPLAY.fit;
+    var rotation = value.rotation;
+    if (rotation !== 0 && rotation !== 90 && rotation !== 180 && rotation !== 270) {
+      rotation = DEFAULT_DISPLAY.rotation;
+    }
+    return {
+      fit: fit,
+      rotation: rotation,
+      flip_h: value.flip_h === true ? true : DEFAULT_DISPLAY.flip_h,
+      flip_v: value.flip_v === true ? true : DEFAULT_DISPLAY.flip_v,
+      width: readDisplayNumber(value.width, DEFAULT_DISPLAY.width, 10, 200),
+      height: readDisplayNumber(value.height, DEFAULT_DISPLAY.height, 10, 200),
+      left: readDisplayNumber(value.left, DEFAULT_DISPLAY.left, -100, 100),
+      top: readDisplayNumber(value.top, DEFAULT_DISPLAY.top, -100, 100)
+    };
+  }
+
+  function loadSavedDisplay() {
+    var raw = storageGet(DISPLAY_KEY);
+    if (!raw) {
+      return normalizeDisplay(null);
+    }
+    try {
+      return normalizeDisplay(JSON.parse(raw));
+    } catch (e) {
+      return normalizeDisplay(null);
+    }
+  }
+
+  function persistDisplay() {
+    try {
+      storageSet(DISPLAY_KEY, JSON.stringify(lastDisplay));
+    } catch (e) {}
+  }
+
+  function fitObjectFit(fit) {
+    if (fit === "fill") {
+      return "cover";
+    }
+    if (fit === "stretch") {
+      return "fill";
+    }
+    return "contain";
+  }
+
+  function applyMediaStyles(element) {
+    if (!element) {
+      return;
+    }
+    var tag = element.tagName ? element.tagName.toLowerCase() : "";
+    if (tag !== "img" && tag !== "video") {
+      return;
+    }
+    var objectFit = fitObjectFit(currentDisplay.fit);
+    element.style.width = "100%";
+    element.style.height = "100%";
+    element.style.display = "block";
+    element.style.background = "#000";
+    element.style.objectFit = objectFit;
+    element.style.webkitObjectFit = objectFit;
+  }
+
+  function applyMediaFit() {
+    var layers = [layerA, layerB];
+    for (var i = 0; i < layers.length; i++) {
+      var layer = layers[i];
+      if (!layer) {
+        continue;
+      }
+      for (var j = 0; j < layer.childNodes.length; j++) {
+        applyMediaStyles(layer.childNodes[j]);
+      }
+    }
+  }
+
+  function applyDisplay(value) {
+    lastDisplay = normalizeDisplay(value);
+    currentDisplay = displayOff ? normalizeDisplay(null) : lastDisplay;
+
+    var frameW = window.innerWidth;
+    var frameH = window.innerHeight;
+    var boxW = frameW * currentDisplay.width / 100;
+    var boxH = frameH * currentDisplay.height / 100;
+    var boxLeft = frameW * currentDisplay.left / 100;
+    var boxTop = frameH * currentDisplay.top / 100;
+    var rotated = currentDisplay.rotation === 90 || currentDisplay.rotation === 270;
+    var canvasW = rotated ? boxH : boxW;
+    var canvasH = rotated ? boxW : boxH;
+    var fx = currentDisplay.flip_h ? -1 : 1;
+    var fy = currentDisplay.flip_v ? -1 : 1;
+    var transform = "translate(-50%, -50%) scale(" + fx + "," + fy + ") rotate(" + currentDisplay.rotation + "deg)";
+
+    lastDisplayLayout = {
+      frameWidth: frameW,
+      frameHeight: frameH,
+      boxLeft: boxLeft,
+      boxTop: boxTop,
+      boxWidth: boxW,
+      boxHeight: boxH,
+      canvasWidth: canvasW,
+      canvasHeight: canvasH
+    };
+
+    if (displayBox) {
+      displayBox.style.left = boxLeft + "px";
+      displayBox.style.top = boxTop + "px";
+      displayBox.style.width = boxW + "px";
+      displayBox.style.height = boxH + "px";
+    }
+
+    if (displayCanvas) {
+      displayCanvas.style.width = canvasW + "px";
+      displayCanvas.style.height = canvasH + "px";
+      displayCanvas.style.webkitTransformOrigin = "50% 50%";
+      displayCanvas.style.transformOrigin = "50% 50%";
+      displayCanvas.style.webkitTransform = transform;
+      displayCanvas.style.transform = transform;
+    }
+
+    applyMediaFit();
+    refreshDebug();
+  }
+
+  function scheduleDisplayApply() {
+    if (displayResizeTimer) {
+      clearTimeout(displayResizeTimer);
+    }
+    displayResizeTimer = setTimeout(function () {
+      displayResizeTimer = null;
+      applyDisplay(lastDisplay);
+    }, 150);
+  }
+
+  function showDisplayToast(message) {
+    if (!displayToast) {
+      return;
+    }
+    displayToast.textContent = message;
+    displayToast.style.display = "block";
+    if (displayToastTimer) {
+      clearTimeout(displayToastTimer);
+    }
+    displayToastTimer = setTimeout(function () {
+      displayToastTimer = null;
+      if (displayToast) {
+        displayToast.style.display = "none";
+      }
+    }, 3000);
+  }
+
+  function toggleDisplayOff() {
+    displayOff = !displayOff;
+    storageSet(DISPLAY_OFF_KEY, displayOff ? "1" : "0");
+    applyDisplay(lastDisplay);
+    showDisplayToast(displayOff ? "Display settings OFF on this device" : "Display settings ON");
   }
 
   function pad2(value) {
@@ -270,12 +491,17 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
         }
       }
     }
+    var parsedDisplay = null;
+    if (row.display && typeof row.display === "object" && !(row.display instanceof Array)) {
+      parsedDisplay = row.display;
+    }
     return {
       status: status,
       expires_at: typeof row.expires_at === "string" ? row.expires_at : null,
       screen_id: typeof row.screen_id === "string" ? row.screen_id : null,
       screen_name: typeof row.screen_name === "string" ? row.screen_name : null,
       playlist_id: typeof row.playlist_id === "string" ? row.playlist_id : null,
+      display: parsedDisplay,
       items: parsedItems
     };
   }
@@ -499,6 +725,41 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
     lines.push("media: " + mediaSize());
     lines.push("window: " + window.innerWidth + "x" + window.innerHeight);
     lines.push("dpr: " + (window.devicePixelRatio || 1));
+    lines.push(
+      "display: " +
+        currentDisplay.fit +
+        " rot=" +
+        currentDisplay.rotation +
+        " flipH=" +
+        (currentDisplay.flip_h ? "yes" : "no") +
+        " flipV=" +
+        (currentDisplay.flip_v ? "yes" : "no") +
+        " w=" +
+        currentDisplay.width +
+        " h=" +
+        currentDisplay.height +
+        " left=" +
+        currentDisplay.left +
+        " top=" +
+        currentDisplay.top
+    );
+    lines.push(
+      "display box: " +
+        lastDisplayLayout.boxLeft.toFixed(1) +
+        "," +
+        lastDisplayLayout.boxTop.toFixed(1) +
+        " " +
+        lastDisplayLayout.boxWidth.toFixed(1) +
+        "x" +
+        lastDisplayLayout.boxHeight.toFixed(1)
+    );
+    lines.push(
+      "display canvas: " +
+        lastDisplayLayout.canvasWidth.toFixed(1) +
+        "x" +
+        lastDisplayLayout.canvasHeight.toFixed(1)
+    );
+    lines.push("display local off: " + (displayOff ? "yes" : "no"));
     lines.push("ua: " + navigator.userAgent);
     lines.push("error: " + (lastError ? lastError.message + " @ " + lastError.line : "--"));
     debugPanel.textContent = lines.join(NEWLINE);
@@ -766,9 +1027,7 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
 
     if (item.type === "image") {
       element = document.createElement("img");
-      element.style.width = "100%";
-      element.style.height = "100%";
-      element.style.objectFit = "contain";
+      applyMediaStyles(element);
       element.setAttribute("draggable", "false");
       element.onload = function () {
         doTransition();
@@ -788,9 +1047,7 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
 
     if (item.type === "video") {
       element = document.createElement("video");
-      element.style.width = "100%";
-      element.style.height = "100%";
-      element.style.objectFit = "contain";
+      applyMediaStyles(element);
       element.muted = true;
       element.autoplay = true;
       element.setAttribute("muted", "muted");
@@ -1064,6 +1321,10 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   }
 
   function handlePoll(response) {
+    if (response.display) {
+      applyDisplay(response.display);
+      persistDisplay();
+    }
     if (response.status === "paired") {
       handlePaired(response);
       return;
@@ -1175,6 +1436,9 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   }
 
   function boot() {
+    displayOff = storageGet(DISPLAY_OFF_KEY) === "1";
+    lastDisplay = loadSavedDisplay();
+    applyDisplay(lastDisplay);
     token = storageGet(TOKEN_KEY);
     code = storageGet(CODE_KEY);
     expiresAt = storageGet(EXPIRES_KEY);
@@ -1222,6 +1486,25 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
       toggleDebug();
     }
   };
+
+  displayHit.onclick = function () {
+    var now = new Date().getTime();
+    var recent = [];
+    for (var i = 0; i < displayTapTimes.length; i++) {
+      if (now - displayTapTimes[i] <= 5000) {
+        recent.push(displayTapTimes[i]);
+      }
+    }
+    recent.push(now);
+    displayTapTimes = recent;
+    if (recent.length >= 7) {
+      displayTapTimes = [];
+      toggleDisplayOff();
+    }
+  };
+
+  window.addEventListener("resize", scheduleDisplayApply, false);
+  window.addEventListener("orientationchange", scheduleDisplayApply, false);
 
   boot();
 })();

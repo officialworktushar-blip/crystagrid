@@ -175,8 +175,10 @@ export default function DisplaySettingsDialog({
       return;
     }
 
+    const node = frameNode;
+
     function updateSize() {
-      const rect = frameNode.getBoundingClientRect();
+      const rect = node.getBoundingClientRect();
       setFrameSize({ width: rect.width, height: rect.height });
     }
 
@@ -189,7 +191,7 @@ export default function DisplaySettingsDialog({
     }
 
     const observer = new ResizeObserver(updateSize);
-    observer.observe(frameNode);
+    observer.observe(node);
 
     return () => observer.disconnect();
   }, [frameNode]);

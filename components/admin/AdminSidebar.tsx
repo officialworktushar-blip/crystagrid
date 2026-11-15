@@ -5,10 +5,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
+  Building2,
+  CalendarCheck,
   Inbox,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Monitor,
+  Package,
+  Tag,
   Users,
   UsersRound,
   X,
@@ -23,12 +28,39 @@ type NavItem = {
   icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
-  { label: "Overview", href: "/admin", icon: LayoutDashboard },
-  { label: "Customers", href: "/admin/customers", icon: Users },
-  { label: "Team", href: "/admin/team", icon: UsersRound },
-  { label: "Leads", href: "/admin/leads", icon: Inbox },
-  { label: "Screens", href: "/admin/screens", icon: Monitor },
+type NavGroup = {
+  label?: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    items: [
+      { label: "Overview", href: "/admin", icon: LayoutDashboard },
+      { label: "Customers", href: "/admin/customers", icon: Users },
+      { label: "Team", href: "/admin/team", icon: UsersRound },
+      { label: "Leads", href: "/admin/leads", icon: Inbox },
+      { label: "Screens", href: "/admin/screens", icon: Monitor },
+    ],
+  },
+  {
+    label: "Ad Inventory",
+    items: [
+      { label: "Places", href: "/admin/ads/places", icon: MapPin },
+      {
+        label: "Properties",
+        href: "/admin/ads/properties",
+        icon: Building2,
+      },
+      { label: "Packages", href: "/admin/ads/packages", icon: Package },
+      { label: "Pricing", href: "/admin/ads/pricing", icon: Tag },
+    ],
+  },
+  {
+    items: [
+      { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
+    ],
+  },
 ];
 
 export default function AdminSidebar({
@@ -130,41 +162,57 @@ export default function AdminSidebar({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-5" aria-label="Admin">
-          {navItems.map((item) => {
-            const isActive =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
-            const Icon = item.icon;
+        <nav
+          className="flex-1 space-y-5 overflow-y-auto px-3 py-5"
+          aria-label="Admin"
+        >
+          {navGroups.map((group, index) => (
+            <div
+              key={group.label ?? `group-${index}`}
+              className="space-y-1"
+            >
+              {group.label ? (
+                <p className="px-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/30">
+                  {group.label}
+                </p>
+              ) : null}
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "group flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
-                  isActive
-                    ? "brand-gradient text-white shadow-brand"
-                    : "text-white/55 hover:bg-white/[0.05] hover:text-white",
-                )}
-              >
-                <Icon
-                  aria-hidden="true"
-                  className={cn(
-                    "h-5 w-5 transition duration-200",
-                    isActive
-                      ? "text-white"
-                      : "text-white/40 group-hover:text-white/80",
-                  )}
-                />
-                {item.label}
-              </Link>
-            );
-          })}
+              {group.items.map((item) => {
+                const isActive =
+                  item.href === "/admin"
+                    ? pathname === "/admin"
+                    : pathname === item.href ||
+                      pathname.startsWith(`${item.href}/`);
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
+                      isActive
+                        ? "brand-gradient text-white shadow-brand"
+                        : "text-white/55 hover:bg-white/[0.05] hover:text-white",
+                    )}
+                  >
+                    <Icon
+                      aria-hidden="true"
+                      className={cn(
+                        "h-5 w-5 transition duration-200",
+                        isActive
+                          ? "text-white"
+                          : "text-white/40 group-hover:text-white/80",
+                      )}
+                    />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="space-y-1 border-t border-white/5 px-3 py-4">

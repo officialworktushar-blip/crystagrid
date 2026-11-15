@@ -1,6 +1,8 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  CalendarCheck,
+  CalendarClock,
   HardDrive,
   Images,
   Inbox,
@@ -71,18 +73,32 @@ export default async function AdminOverviewPage() {
   const supabase = await createClient();
   const now = Date.now();
 
-  const [statsResult, teamResult, screensResult, leadsResult] =
-    await Promise.all([
-      supabase.rpc("admin_customer_stats"),
-      supabase.rpc("admin_list_team"),
-      supabase
-        .from("screens")
-        .select("id, customer_id, name, last_seen")
-        .not("last_seen", "is", null)
-        .order("last_seen", { ascending: false })
-        .limit(8),
-      supabase.from("leads").select("id", { count: "exact", head: true }),
-    ]);
+  const [
+    statsResult,
+    teamResult,
+    screensResult,
+    leadsResult,
+    pendingBookingsResult,
+    activeBookingsResult,
+  ] = await Promise.all([
+    supabase.rpc("admin_customer_stats"),
+    supabase.rpc("admin_list_team"),
+    supabase
+      .from("screens")
+      .select("id, customer_id, name, last_seen")
+      .not("last_seen", "is", null)
+      .order("last_seen", { ascending: false })
+      .limit(8),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
+    supabase
+      .from("ad_bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("ad_bookings")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["confirmed", "running"]),
+  ]);
 
   const customers = normalizeAdminCustomerStats(statsResult.data);
   const managers = normalizeAdminTeam(teamResult.data);
@@ -143,6 +159,18 @@ export default async function AdminOverviewPage() {
       accent: "text-pink-300",
     },
     {
+      label: "Pending bookings",
+      value: String(pendingBookingsResult.count ?? 0),
+      icon: CalendarClock,
+      accent: "text-amber-300",
+    },
+    {
+      label: "Confirmed or running campaigns",
+      value: String(activeBookingsResult.count ?? 0),
+      icon: CalendarCheck,
+      accent: "text-emerald-300",
+    },
+    {
       label: "Total screens",
       value: String(totalScreens),
       icon: Monitor,
@@ -173,6 +201,8 @@ export default async function AdminOverviewPage() {
     teamResult.error?.message ??
     screensResult.error?.message ??
     leadsResult.error?.message ??
+    pendingBookingsResult.error?.message ??
+    activeBookingsResult.error?.message ??
     null;
 
   return (

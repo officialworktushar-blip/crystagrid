@@ -45,6 +45,48 @@ export interface AdPropertyDependency {
   type_id: string | null;
 }
 
+export interface AdPackage {
+  id: string;
+  city_id: string;
+  type_id: string | null;
+  name: string;
+  description: string | null;
+  monthly_reach: number;
+  rate: number;
+  rate_unit: AdRateUnit;
+  is_active: boolean;
+  sort: number;
+}
+
+export interface AdPackageProperty {
+  package_id: string;
+  property_id: string;
+}
+
+export interface AdSettings {
+  id: number;
+  online_discount_pct: number;
+  gst_pct: number;
+  platinum_multiplier: number;
+  max_total_discount_pct: number;
+}
+
+export interface AdPromoCode {
+  code: string;
+  discount_pct: number;
+  is_active: boolean;
+  expires_at: string | null;
+  note: string | null;
+}
+
+export const DEFAULT_AD_SETTINGS: AdSettings = {
+  id: 1,
+  online_discount_pct: 0,
+  gst_pct: 0,
+  platinum_multiplier: 1,
+  max_total_discount_pct: 0,
+};
+
 const inrFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
   currency: "INR",
@@ -95,4 +137,12 @@ export function ratePerDay(rate: number, unit: AdRateUnit): number {
   }
 
   return unit === "week" ? rate / 7 : rate;
+}
+
+export function ratePerWeek(rate: number, unit: AdRateUnit): number {
+  if (!Number.isFinite(rate) || rate < 0) {
+    return 0;
+  }
+
+  return unit === "week" ? rate : rate * 7;
 }

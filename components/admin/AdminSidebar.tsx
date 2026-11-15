@@ -131,7 +131,7 @@ export default function AdminSidebar({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
+        <div className="flex h-20 items-center justify-between border-b border-white/5 px-5">
           <Link
             href="/admin"
             onClick={onClose}
@@ -143,7 +143,7 @@ export default function AdminSidebar({
               width={128}
               height={128}
               loading="eager"
-              className="h-12 w-auto max-w-36 shrink-0 object-contain"
+              className="h-16 w-auto max-w-36 shrink-0 object-contain"
             />
             <span className="shrink-0 rounded-full border border-sky-400/25 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.16em] text-sky-200">
               ADMIN

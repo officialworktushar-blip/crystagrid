@@ -107,7 +107,7 @@ function PlanContent({ plan }: { plan: Plan }) {
 
 export default function Pricing() {
   return (
-    <section id="pricing" className="py-24">
+    <section id="pricing" className="scroll-mt-28 py-24">
       <Container>
         <motion.div {...fadeUp}>
           <SectionHeading eyebrow="Pricing" title="Simple plans." />

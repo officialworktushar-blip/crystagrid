@@ -91,7 +91,7 @@ export default function ManageSidebar({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
+        <div className="flex h-20 items-center justify-between border-b border-white/5 px-5">
           <Link
             href="/manage"
             onClick={onClose}
@@ -103,7 +103,7 @@ export default function ManageSidebar({
               width={128}
               height={128}
               loading="eager"
-              className="h-12 w-auto max-w-36 shrink-0 object-contain"
+              className="h-16 w-auto max-w-36 shrink-0 object-contain"
             />
           </Link>
 

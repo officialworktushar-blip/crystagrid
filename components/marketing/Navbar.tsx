@@ -115,7 +115,7 @@ export default function Navbar() {
           : "relative z-10 bg-transparent",
       )}
     >
-      <div className="mx-auto flex h-20 w-full max-w-[1540px] items-center justify-between gap-4 px-6 lg:gap-0 xl:gap-4">
+      <div className="mx-auto flex h-28 w-full max-w-[1540px] items-center justify-between gap-4 px-6 lg:gap-0 xl:gap-4">
         <Link
           href="/"
           className="flex shrink-0 items-center gap-3 whitespace-nowrap text-3xl font-bold tracking-tight text-white"
@@ -126,7 +126,7 @@ export default function Navbar() {
             width={160}
             height={160}
             loading="eager"
-            className="h-14 w-auto shrink-0 object-contain sm:h-16"
+            className="h-20 w-auto shrink-0 object-contain sm:h-24"
           />
         </Link>
 
@@ -216,7 +216,7 @@ export default function Navbar() {
       {mobileOpen ? (
         <div
           id="mobile-navigation"
-          className="absolute inset-x-0 top-full max-h-[calc(100svh_-_80px)] overflow-y-auto border-b border-white/10 bg-background/95 backdrop-blur-lg lg:hidden"
+          className="absolute inset-x-0 top-full max-h-[calc(100svh_-_112px)] overflow-y-auto border-b border-white/10 bg-background/95 backdrop-blur-lg lg:hidden"
         >
           <div className="mx-auto w-full max-w-[1540px] px-6 py-4">
             <nav aria-label="Mobile navigation" className="flex flex-col gap-1">

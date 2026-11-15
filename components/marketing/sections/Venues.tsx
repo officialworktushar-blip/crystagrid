@@ -47,7 +47,7 @@ const fadeUp = {
 
 export default function Venues() {
   return (
-    <section id="venues" className="scroll-mt-24 py-24">
+    <section id="venues" className="scroll-mt-28 py-24">
       <Container>
         <motion.div {...fadeUp}>
           <SectionHeading

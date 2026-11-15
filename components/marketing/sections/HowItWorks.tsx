@@ -60,7 +60,7 @@ const fadeUp = {
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="scroll-mt-24 py-24">
+    <section id="how-it-works" className="scroll-mt-28 py-24">
       <Container>
         <motion.div
           {...fadeUp}

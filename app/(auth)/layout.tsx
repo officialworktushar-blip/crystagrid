@@ -25,7 +25,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               width={192}
               height={192}
               loading="eager"
-              className="h-20 w-auto max-w-[70vw] shrink-0 object-contain"
+              className="h-32 w-auto max-w-[70vw] shrink-0 object-contain"
             />
           </Link>
         </div>

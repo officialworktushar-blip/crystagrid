@@ -90,7 +90,7 @@ export default function Sidebar({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
+        <div className="flex h-24 items-center justify-between border-b border-white/5 px-5">
           <div className="flex min-w-0 flex-col items-start gap-1">
             <Link
               href="/dashboard"
@@ -103,7 +103,7 @@ export default function Sidebar({
                 width={128}
                 height={128}
                 loading="eager"
-                className="h-12 w-auto max-w-36 shrink-0 object-contain"
+                className="h-16 w-auto max-w-36 shrink-0 object-contain"
               />
             </Link>
 

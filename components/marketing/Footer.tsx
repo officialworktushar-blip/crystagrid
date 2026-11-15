@@ -28,7 +28,7 @@ export default function Footer() {
                 src="/logo.webp"
                 alt=""
                 width={128}
-                height={47}
+                height={128}
                 className="h-12 w-auto max-w-36 shrink-0 object-contain"
               />
             </Link>

@@ -124,7 +124,7 @@ export default function Navbar() {
             src="/logo.webp"
             alt=""
             width={160}
-            height={59}
+            height={160}
             loading="eager"
             className="h-14 w-auto shrink-0 object-contain sm:h-16"
           />

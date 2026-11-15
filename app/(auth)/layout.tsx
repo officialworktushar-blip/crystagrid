@@ -23,7 +23,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               src="/logo.webp"
               alt=""
               width={192}
-              height={70}
+              height={192}
               loading="eager"
               className="h-20 w-auto max-w-[70vw] shrink-0 object-contain"
             />

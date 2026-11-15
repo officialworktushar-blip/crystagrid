@@ -236,7 +236,7 @@ function BrandLogo() {
         src="/logo.webp"
         alt="Crystagrid"
         width={320}
-        height={117}
+        height={320}
         loading="eager"
         className="h-24 w-auto max-w-[82vw] shrink-0 object-contain sm:h-28 md:h-32"
       />

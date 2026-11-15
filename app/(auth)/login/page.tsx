@@ -9,6 +9,27 @@ import { createClient } from "@/lib/supabase/client";
 const inputClass =
   "h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40";
 
+function resolveSafeNext(value: string | null): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+
+  try {
+    const target = new URL(value, window.location.origin);
+
+    if (
+      target.origin !== window.location.origin ||
+      !target.pathname.startsWith("/")
+    ) {
+      return null;
+    }
+
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -34,6 +55,10 @@ export default function LoginPage() {
         return;
       }
 
+      const requestedNext = new URLSearchParams(window.location.search).get(
+        "next",
+      );
+      const safeNext = resolveSafeNext(requestedNext);
       let destination = "/dashboard";
 
       if (signInData.user) {
@@ -48,6 +73,8 @@ export default function LoginPage() {
           destination = "/admin";
         } else if (profile?.role === "manager") {
           destination = "/manage";
+        } else if (safeNext) {
+          destination = safeNext;
         }
       }
 

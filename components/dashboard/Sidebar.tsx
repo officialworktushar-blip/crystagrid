@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import {
@@ -96,16 +97,14 @@ export default function Sidebar({
               onClick={onClose}
               className="flex items-center gap-2.5 text-base font-bold tracking-tight text-white"
             >
-              <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg shadow-brand">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="h-4 w-4 text-white"
-                >
-                  <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-                </svg>
-              </span>
+              <Image
+                src="/logo.webp"
+                alt=""
+                width={32}
+                height={32}
+                loading="eager"
+                className="h-8 w-8 shrink-0 rounded-lg object-contain"
+              />
               Crystagrid
             </Link>
 

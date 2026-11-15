@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
@@ -231,16 +232,14 @@ function usePlayableUrl(url: string | null): string | null {
 function BrandLogo() {
   return (
     <div className="flex items-center gap-3">
-      <span className="brand-gradient flex h-12 w-12 items-center justify-center rounded-2xl shadow-brand">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          className="h-6 w-6 text-white"
-        >
-          <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-        </svg>
-      </span>
+      <Image
+        src="/logo.webp"
+        alt=""
+        width={48}
+        height={48}
+        loading="eager"
+        className="h-12 w-12 shrink-0 rounded-2xl object-contain"
+      />
       <span className="text-2xl font-bold tracking-tight text-white">
         Crystagrid
       </span>

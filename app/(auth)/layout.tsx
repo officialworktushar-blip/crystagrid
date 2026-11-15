@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -18,16 +19,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             href="/"
             className="inline-flex items-center gap-3 text-2xl font-bold tracking-tight text-white"
           >
-            <span className="brand-gradient flex h-10 w-10 items-center justify-center rounded-xl shadow-brand">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-5 w-5 text-white"
-              >
-                <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-              </svg>
-            </span>
+            <Image
+              src="/logo.webp"
+              alt=""
+              width={40}
+              height={40}
+              loading="eager"
+              className="h-10 w-10 shrink-0 rounded-xl object-contain"
+            />
             Crystagrid
           </Link>
         </div>

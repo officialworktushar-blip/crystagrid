@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
@@ -119,16 +120,14 @@ export default function Navbar() {
           href="/"
           className="flex shrink-0 items-center gap-3 whitespace-nowrap text-3xl font-bold tracking-tight text-white"
         >
-          <span className="brand-gradient flex h-9 w-9 items-center justify-center rounded-xl shadow-brand">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="h-5 w-5 text-white"
-            >
-              <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-            </svg>
-          </span>
+          <Image
+            src="/logo.webp"
+            alt=""
+            width={36}
+            height={36}
+            loading="eager"
+            className="h-9 w-9 shrink-0 rounded-xl object-contain"
+          />
           Crystagrid
         </Link>
 

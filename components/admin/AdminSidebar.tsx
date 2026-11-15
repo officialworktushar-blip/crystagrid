@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -136,16 +137,14 @@ export default function AdminSidebar({
             onClick={onClose}
             className="flex min-w-0 items-center gap-2 text-base font-bold tracking-tight text-white"
           >
-            <span className="brand-gradient flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-brand">
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-4 w-4 text-white"
-              >
-                <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
-              </svg>
-            </span>
+            <Image
+              src="/logo.webp"
+              alt=""
+              width={32}
+              height={32}
+              loading="eager"
+              className="h-8 w-8 shrink-0 rounded-lg object-contain"
+            />
             <span className="truncate">Crystagrid</span>
             <span className="shrink-0 rounded-full border border-sky-400/25 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.16em] text-sky-200">
               ADMIN

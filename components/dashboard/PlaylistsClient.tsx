@@ -19,8 +19,8 @@ import type { Playlist } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export type PlaylistSummary = Playlist & {
-  itemCount: number;
-  totalDuration: number;
+  slotCount: number;
+  loopSeconds: number;
 };
 
 const createdFormatter = new Intl.DateTimeFormat("en", {
@@ -300,8 +300,7 @@ export default function PlaylistsClient({
                     <ListVideo aria-hidden="true" className="h-5 w-5" />
                   </span>
                   <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-body">
-                    {playlist.itemCount}{" "}
-                    {playlist.itemCount === 1 ? "item" : "items"}
+                    {playlist.slotCount}/10 slots
                   </span>
                 </div>
 
@@ -316,8 +315,9 @@ export default function PlaylistsClient({
 
                 <div className="mt-auto flex items-center gap-2 text-sm text-body">
                   <Clock aria-hidden="true" className="h-4 w-4 text-muted" />
+                  <span className="text-muted">Loop time</span>
                   <span className="tabular-nums">
-                    {formatDuration(playlist.totalDuration)}
+                    {formatDuration(playlist.loopSeconds)}
                   </span>
                 </div>
               </Link>

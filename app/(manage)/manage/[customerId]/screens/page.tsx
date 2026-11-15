@@ -22,6 +22,7 @@ type ContentItemRow = {
   id: string;
   position: number;
   duration: number | null;
+  clip_start: number | null;
   media: ContentMediaRow | ContentMediaRow[] | null;
 };
 
@@ -86,6 +87,7 @@ export default async function ManageCustomerScreensPage({
               id,
               position,
               duration,
+              clip_start,
               media (
                 id,
                 name,
@@ -135,7 +137,17 @@ export default async function ManageCustomerScreensPage({
             name: media.name,
             type: media.type,
             file_path: media.file_path,
-            duration: media.type === "video" ? media.duration : item.duration,
+            duration:
+              item.duration ??
+              (media.type === "video"
+                ? Math.min(
+                    10,
+                    media.duration && media.duration > 0 ? media.duration : 10,
+                  )
+                : 10),
+            clip_start: item.clip_start ?? 0,
+            mediaDuration: media.duration,
+            position: item.position,
           });
         }
 

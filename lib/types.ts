@@ -60,6 +60,7 @@ export interface PlaylistItem {
   media_id: string;
   position: number;
   duration: number | null;
+  clip_start: number;
   created_at: string;
 }
 

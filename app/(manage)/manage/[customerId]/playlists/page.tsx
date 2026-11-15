@@ -64,20 +64,21 @@ export default async function ManageCustomerPlaylistsPage({
 
   const summaries: PlaylistSummary[] = playlists.map((playlist) => {
     const playlistItems = itemsByPlaylist.get(playlist.id) ?? [];
-    const totalDuration = playlistItems.reduce((sum, item) => {
-      const mediaItem = mediaById.get(item.media_id);
-
-      if (mediaItem?.type === "video") {
-        return sum + (mediaItem.duration ?? 0);
+    const loopSeconds = playlistItems.reduce((sum, item) => {
+      if (typeof item.duration === "number" && Number.isFinite(item.duration)) {
+        return sum + item.duration;
       }
 
-      return sum + (item.duration ?? 10);
+      const mediaItem = mediaById.get(item.media_id);
+      const mediaDuration = mediaItem?.duration ?? 0;
+
+      return sum + Math.min(10, mediaDuration > 0 ? mediaDuration : 10);
     }, 0);
 
     return {
       ...playlist,
-      itemCount: playlistItems.length,
-      totalDuration,
+      slotCount: playlistItems.length,
+      loopSeconds,
     };
   });
 

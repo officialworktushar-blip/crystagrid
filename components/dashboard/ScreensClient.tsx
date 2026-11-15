@@ -26,6 +26,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Scissors,
   Trash2,
   X,
 } from "lucide-react";
@@ -82,6 +83,9 @@ export type ScreenContentItem = {
   type: MediaType;
   file_path: string;
   duration: number | null;
+  clip_start: number | null;
+  mediaDuration: number | null;
+  position: number;
 };
 
 export type ScreenContentMap = Record<string, ScreenContentItem[]>;
@@ -96,6 +100,14 @@ function formatDuration(seconds: number | null) {
   }
 
   return `${minutes}m ${remaining.toString().padStart(2, "0")}s`;
+}
+
+function formatClipClock(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const remaining = total % 60;
+
+  return `${minutes}:${remaining.toString().padStart(2, "0")}`;
 }
 
 function ScreenContentSection({ items }: { items: ScreenContentItem[] }) {
@@ -138,46 +150,62 @@ function ScreenContentSection({ items }: { items: ScreenContentItem[] }) {
           </p>
         ) : (
           <ul className="space-y-2 border-t border-white/5 px-3 py-3">
-            {items.map((item, index) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-2"
-              >
-                <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40">
-                  {item.type === "video" ? (
-                    <video
-                      src={getMediaUrl(item.file_path)}
-                      muted
-                      playsInline
-                      preload="metadata"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <img
-                      src={getMediaUrl(item.file_path)}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">
-                    {item.name}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+            {items.map((item) => {
+              const clipStart = item.clip_start ?? 0;
+              const clipped =
+                item.type === "video" &&
+                (clipStart > 0 || (item.mediaDuration ?? 0) > 10);
+
+              return (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-2"
+                >
+                  <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40">
                     {item.type === "video" ? (
-                      <Film aria-hidden="true" className="h-3 w-3" />
+                      <video
+                        src={getMediaUrl(item.file_path)}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
-                      <Images aria-hidden="true" className="h-3 w-3" />
+                      <img
+                        src={getMediaUrl(item.file_path)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     )}
-                    {item.type === "video" ? "Video" : "Image"}
-                    <span aria-hidden="true">·</span>
-                    {formatDuration(item.duration)}
-                  </p>
-                </div>
-                <span className="text-xs text-muted">#{index + 1}</span>
-              </li>
-            ))}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      {item.name}
+                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                      {item.type === "video" ? (
+                        <Film aria-hidden="true" className="h-3 w-3" />
+                      ) : (
+                        <Images aria-hidden="true" className="h-3 w-3" />
+                      )}
+                      {item.type === "video" ? "Video" : "Image"}
+                      <span aria-hidden="true">·</span>
+                      {formatDuration(item.duration)}
+                      {clipped ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-sky-100">
+                          <Scissors aria-hidden="true" className="h-3 w-3" />
+                          Clip {formatClipClock(clipStart)} -{" "}
+                          {formatClipClock(clipStart + 10)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    Slot {item.position + 1}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )
       ) : null}

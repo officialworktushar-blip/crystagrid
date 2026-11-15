@@ -21,34 +21,34 @@ import {
 import {
   SortableContext,
   arrayMove,
+  rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
-  ChevronDown,
-  ChevronUp,
   Film,
   GripVertical,
-  Images,
   ListVideo,
   Loader2,
   Plus,
-  Search,
+  RefreshCw,
+  Scissors,
   Trash2,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import ClipDialog from "@/components/dashboard/ClipDialog";
+import ContentPicker from "@/components/dashboard/ContentPicker";
 import { getMediaUrl } from "@/lib/media";
 import { notifyScreens } from "@/lib/realtime";
 import { isOnline } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import type {
   Media,
-  MediaType,
   Playlist,
   PlaylistItem,
   Screen,
@@ -56,20 +56,41 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const MEDIA_FILTERS: { label: string; value: "all" | MediaType }[] = [
-  { label: "All", value: "all" },
-  { label: "Images", value: "image" },
-  { label: "Videos", value: "video" },
-];
+const MAX_SLOTS = 10;
+const CLIP_LENGTH = 10;
 
 type SaveState = "idle" | "saving" | "saved";
 
-function formatDuration(seconds: number) {
-  const totalSeconds = Math.max(0, Math.round(Number(seconds) || 0));
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainingSeconds = totalSeconds % 60;
+type PickerState =
+  | { mode: "add" }
+  | { mode: "change"; itemId: string }
+  | null;
 
-  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+type ClipState =
+  | { mode: "add"; media: Media; initialStart: number }
+  | { mode: "change"; itemId: string; media: Media; initialStart: number }
+  | { mode: "edit"; itemId: string; media: Media; initialStart: number };
+
+function formatClock(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const remaining = total % 60;
+
+  return `${minutes}:${remaining.toString().padStart(2, "0")}`;
+}
+
+function formatLoopTime(seconds: number) {
+  const total = Math.max(0, Math.round(seconds));
+
+  if (total <= 59) {
+    return `${total}s`;
+  }
+
+  return formatClock(total);
+}
+
+function formatDurationChip(seconds: number) {
+  return `${Math.max(1, Math.round(seconds))}s`;
 }
 
 function createTempId(prefix: string) {
@@ -81,6 +102,55 @@ function createTempId(prefix: string) {
   }
 
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function resolveSlotDuration(item: PlaylistItem, mediaItem?: Media) {
+  if (
+    typeof item.duration === "number" &&
+    Number.isFinite(item.duration) &&
+    item.duration > 0
+  ) {
+    return Math.max(1, Math.min(CLIP_LENGTH, Math.round(item.duration)));
+  }
+
+  if (mediaItem?.type === "video") {
+    const length = mediaItem.duration;
+
+    if (typeof length === "number" && Number.isFinite(length) && length > 0) {
+      return Math.max(1, Math.min(CLIP_LENGTH, Math.round(length)));
+    }
+  }
+
+  return CLIP_LENGTH;
+}
+
+function isClippedItem(
+  item: PlaylistItem,
+  mediaItem: Media | undefined,
+  resolvedDuration: number,
+) {
+  if (mediaItem?.type !== "video") {
+    return false;
+  }
+
+  if ((item.clip_start ?? 0) > 0) {
+    return true;
+  }
+
+  return (
+    (mediaItem.duration ?? 0) > CLIP_LENGTH &&
+    resolvedDuration >= CLIP_LENGTH
+  );
+}
+
+function canEditClip(item: PlaylistItem, mediaItem: Media | undefined) {
+  if (mediaItem?.type !== "video") {
+    return false;
+  }
+
+  return (
+    (mediaItem.duration ?? 0) > CLIP_LENGTH || (item.clip_start ?? 0) > 0
+  );
 }
 
 function MediaPreview({
@@ -115,24 +185,24 @@ function MediaPreview({
   );
 }
 
-function SortableItemRow({
+function SortableSlotCard({
   item,
-  index,
+  slotNumber,
   mediaItem,
   busy,
   canEdit,
+  onChange,
+  onEditClip,
   onRemove,
-  onDurationInput,
-  onDurationCommit,
 }: {
   item: PlaylistItem;
-  index: number;
+  slotNumber: number;
   mediaItem: Media | undefined;
   busy: boolean;
   canEdit: boolean;
-  onRemove: (itemId: string) => void;
-  onDurationInput: (itemId: string, value: string) => void;
-  onDurationCommit: (itemId: string, value: string) => void;
+  onChange: () => void;
+  onEditClip: () => void;
+  onRemove: () => void;
 }) {
   const {
     attributes,
@@ -141,114 +211,152 @@ function SortableItemRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id });
+  } = useSortable({ id: item.id, disabled: !canEdit });
 
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
-  const isVideo = mediaItem?.type === "video";
+  const duration = resolveSlotDuration(item, mediaItem);
+  const clipStart = item.clip_start ?? 0;
+  const clipped = isClippedItem(item, mediaItem, duration);
+  const showClipButton = canEdit && canEditClip(item, mediaItem);
 
   return (
-    <li
+    <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-3 transition sm:flex-row sm:items-center",
+        "relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] transition duration-200",
         isDragging && "z-10 border-sky-400/40 bg-surface-2 shadow-card",
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        {canEdit ? (
-          <button
-            type="button"
-            aria-label="Drag to reorder"
-            className="flex h-8 w-7 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-white/35 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical aria-hidden="true" className="h-4 w-4" />
-          </button>
-        ) : null}
-
-        <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-muted">
-          {index + 1}
-        </span>
-
-        <span className="relative h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40">
-          {mediaItem ? (
-            <MediaPreview item={mediaItem} />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-muted">
-              <Film aria-hidden="true" className="h-4 w-4" />
-            </span>
-          )}
-        </span>
-
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-white">
-            {mediaItem?.name ?? "Media unavailable"}
-          </p>
-          <span className="mt-1 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
-            {isVideo ? "Video" : "Image"}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 pl-9 sm:pl-0">
-        {isVideo ? (
-          <span className="text-xs text-muted">
-            Plays full video ({formatDuration(mediaItem?.duration ?? 0)})
-          </span>
-        ) : canEdit ? (
-          <label className="flex items-center gap-2 text-xs text-muted">
-            Duration
-            <input
-              type="number"
-              min={1}
-              max={600}
-              placeholder="10"
-              value={item.duration ?? ""}
-              onChange={(event) =>
-                onDurationInput(item.id, event.target.value)
-              }
-              onBlur={(event) =>
-                onDurationCommit(item.id, event.target.value)
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.currentTarget.blur();
-                }
-              }}
-              className="h-9 w-20 rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40"
-            />
-            <span>s</span>
-          </label>
+      <div className="relative aspect-video w-full overflow-hidden bg-black/40">
+        {mediaItem ? (
+          <MediaPreview item={mediaItem} />
         ) : (
-          <span className="text-xs text-muted">
-            Duration {formatDuration(item.duration ?? 10)}
+          <span className="flex h-full w-full items-center justify-center text-muted">
+            <Film aria-hidden="true" className="h-5 w-5" />
           </span>
         )}
 
+        <span className="absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-black/60 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80 backdrop-blur">
+          Slot {slotNumber}
+        </span>
+
+        <span className="absolute bottom-2 left-2 inline-flex items-center rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-white backdrop-blur">
+          {formatDurationChip(duration)}
+        </span>
+
+        <span className="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-white/10 bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 backdrop-blur">
+          {mediaItem?.type === "video" ? "Video" : "Image"}
+        </span>
+
         {canEdit ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onRemove(item.id)}
-            disabled={busy}
-            aria-label="Remove item"
-            className="h-8 w-8 px-0 text-red-300 hover:bg-red-400/10 hover:text-red-200"
+          <button
+            type="button"
+            aria-label={`Drag slot ${slotNumber} to reorder`}
+            className="absolute right-2 top-2 flex h-7 w-7 touch-none cursor-grab items-center justify-center rounded-full bg-black/60 text-white/60 backdrop-blur transition duration-200 hover:bg-black/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
           >
-            {busy ? (
-              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 aria-hidden="true" className="h-4 w-4" />
-            )}
-          </Button>
+            <GripVertical aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+
+        {busy ? (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
+            <Loader2
+              aria-hidden="true"
+              className="h-5 w-5 animate-spin text-white"
+            />
+          </span>
         ) : null}
       </div>
-    </li>
+
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <p className="truncate text-sm font-medium text-white">
+          {mediaItem?.name ?? "Media unavailable"}
+        </p>
+
+        {clipped ? (
+          <span className="inline-flex w-fit items-center gap-1 rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-sky-100">
+            <Scissors aria-hidden="true" className="h-3 w-3" />
+            Clip {formatClock(clipStart)} - {formatClock(clipStart + CLIP_LENGTH)}
+          </span>
+        ) : null}
+
+        {canEdit ? (
+          <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={onChange}
+              disabled={busy}
+              className="inline-flex h-7 items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-white/80 transition duration-200 hover:border-white/20 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-50"
+            >
+              <RefreshCw aria-hidden="true" className="h-3 w-3" />
+              Change
+            </button>
+
+            {showClipButton ? (
+              <button
+                type="button"
+                onClick={onEditClip}
+                disabled={busy}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 text-[11px] font-medium text-sky-100 transition duration-200 hover:border-sky-400/40 hover:bg-sky-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-50"
+              >
+                <Scissors aria-hidden="true" className="h-3 w-3" />
+                Edit clip
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={busy}
+              aria-label={`Remove slot ${slotNumber}`}
+              className="ml-auto inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium text-red-300 transition duration-200 hover:bg-red-400/10 hover:text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-50"
+            >
+              <Trash2 aria-hidden="true" className="h-3 w-3" />
+              Remove
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EmptySlotCard({
+  slotNumber,
+  disabled,
+  onAdd,
+}: {
+  slotNumber: number;
+  disabled: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      disabled={disabled}
+      className="group relative flex min-h-[188px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-white/[0.01] p-4 text-center transition duration-200 hover:border-sky-400/40 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      <span className="absolute left-2 top-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white/5 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
+        Slot {slotNumber}
+      </span>
+
+      <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-brand-sky transition duration-200 group-hover:border-sky-400/40 group-hover:bg-sky-400/10">
+        <Plus aria-hidden="true" className="h-4 w-4" />
+      </span>
+
+      <span className="text-sm font-medium text-white">
+        {disabled ? "Maximum 10 slots reached" : "+ Add content"}
+      </span>
+      <span className="text-xs text-muted">Up to 10 seconds</span>
+    </button>
   );
 }
 
@@ -273,16 +381,15 @@ export default function PlaylistEditor({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<PlaylistItem[]>(initialItems);
+  const [mediaList, setMediaList] = useState<Media[]>(media);
   const [assignments, setAssignments] =
     useState<ScreenPlaylist[]>(screenPlaylists);
   const [name, setName] = useState(playlist.name);
   const [savedName, setSavedName] = useState(playlist.name);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | MediaType>("all");
-  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [picker, setPicker] = useState<PickerState>(null);
+  const [clipState, setClipState] = useState<ClipState | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [busyMediaId, setBusyMediaId] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [busyScreenId, setBusyScreenId] = useState<string | null>(null);
   const [now, setNow] = useState(0);
@@ -291,7 +398,7 @@ export default function PlaylistEditor({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
+      activationConstraint: { distance: 6 },
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
@@ -327,6 +434,20 @@ export default function PlaylistEditor({
       .eq("id", playlist.id);
   }, [supabase, playlist.id]);
 
+  const refreshAssignedScreens = useCallback(() => {
+    const screenIds = assignments
+      .filter(
+        (assignment) =>
+          assignment.playlist_id === playlist.id &&
+          assignment.is_active !== false,
+      )
+      .map((assignment) => assignment.screen_id);
+
+    if (screenIds.length > 0) {
+      void notifyScreens(screenIds, "refresh");
+    }
+  }, [assignments, playlist.id]);
+
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
@@ -343,8 +464,11 @@ export default function PlaylistEditor({
   }, []);
 
   const mediaById = useMemo(
-    () => new Map<string, Media>(media.map((item) => [item.id, item] as const)),
-    [media],
+    () =>
+      new Map<string, Media>(
+        mediaList.map((item) => [item.id, item] as const),
+      ),
+    [mediaList],
   );
 
   const playlistNameById = useMemo(
@@ -379,34 +503,51 @@ export default function PlaylistEditor({
     [items],
   );
 
-  const totalDuration = useMemo(
+  const loopSeconds = useMemo(
     () =>
-      sortedItems.reduce((sum, item) => {
-        const mediaItem = mediaById.get(item.media_id);
-
-        if (mediaItem?.type === "video") {
-          return sum + (mediaItem.duration ?? 0);
-        }
-
-        return sum + (item.duration ?? 10);
-      }, 0),
+      sortedItems.reduce(
+        (sum, item) =>
+          sum + resolveSlotDuration(item, mediaById.get(item.media_id)),
+        0,
+      ),
     [sortedItems, mediaById],
   );
 
-  const filteredMedia = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const isFull = sortedItems.length >= MAX_SLOTS;
+  const hasOverflow = sortedItems.length > MAX_SLOTS;
+  const gridSlots = canEdit
+    ? Math.max(MAX_SLOTS, sortedItems.length)
+    : sortedItems.length;
 
-    return media.filter((item) => {
-      if (filter !== "all" && item.type !== filter) {
-        return false;
-      }
+  function buildRows(nextItems: PlaylistItem[]) {
+    return nextItems.map((entry) => {
+      const mediaItem = mediaById.get(entry.media_id);
 
-      return query === "" || item.name.toLowerCase().includes(query);
+      return {
+        id: entry.id,
+        playlist_id: playlist.id,
+        media_id: entry.media_id,
+        position: entry.position,
+        duration: entry.duration ?? resolveSlotDuration(entry, mediaItem),
+        clip_start: entry.clip_start ?? 0,
+      };
     });
-  }, [media, filter, search]);
+  }
+
+  async function persistPositions(nextItems: PlaylistItem[]) {
+    if (nextItems.length === 0) {
+      return null;
+    }
+
+    const { error: upsertError } = await supabase
+      .from("playlist_items")
+      .upsert(buildRows(nextItems), { onConflict: "id" });
+
+    return upsertError;
+  }
 
   async function handleDragEnd(event: DragEndEvent) {
-    if (!canEdit) {
+    if (!canEdit || busyItemId) {
       return;
     }
 
@@ -436,17 +577,7 @@ export default function PlaylistEditor({
     setItems(reordered);
     markSaving();
 
-    const rows = reordered.map((item) => ({
-      id: item.id,
-      playlist_id: playlist.id,
-      media_id: item.media_id,
-      position: item.position,
-      duration: item.duration ?? null,
-    }));
-
-    const { error: upsertError } = await supabase
-      .from("playlist_items")
-      .upsert(rows, { onConflict: "id" });
+    const upsertError = await persistPositions(reordered);
 
     if (upsertError) {
       setItems(previousItems);
@@ -456,15 +587,25 @@ export default function PlaylistEditor({
     }
 
     await touchPlaylist();
+    refreshAssignedScreens();
     markSaved();
   }
 
-  async function handleAddItem(mediaItem: Media) {
-    if (!canEdit || busyMediaId) {
+  async function handleAddItem(
+    mediaItem: Media,
+    duration: number,
+    clipStart: number,
+  ) {
+    if (!canEdit || busyItemId) {
       return;
     }
 
-    const position = items.length;
+    if (sortedItems.length >= MAX_SLOTS) {
+      setError("Maximum 10 slots reached. Remove a slot before adding content.");
+      return;
+    }
+
+    const position = sortedItems.length;
     const tempId = createTempId("item");
     const previousItems = items;
     const optimistic: PlaylistItem = {
@@ -472,12 +613,13 @@ export default function PlaylistEditor({
       playlist_id: playlist.id,
       media_id: mediaItem.id,
       position,
-      duration: null,
+      duration,
+      clip_start: clipStart,
       created_at: new Date().toISOString(),
     };
 
     setError(null);
-    setBusyMediaId(mediaItem.id);
+    setBusyItemId(tempId);
     setItems([...items, optimistic]);
     markSaving();
 
@@ -487,15 +629,19 @@ export default function PlaylistEditor({
         playlist_id: playlist.id,
         media_id: mediaItem.id,
         position,
+        duration,
+        clip_start: clipStart,
       })
-      .select("id, playlist_id, media_id, position, duration, created_at")
+      .select(
+        "id, playlist_id, media_id, position, duration, clip_start, created_at",
+      )
       .single();
 
     if (insertError || !data) {
       setItems(previousItems);
       setError(insertError?.message ?? "Could not add this media item.");
       setSaveState("idle");
-      setBusyMediaId(null);
+      setBusyItemId(null);
       return;
     }
 
@@ -504,13 +650,126 @@ export default function PlaylistEditor({
         item.id === tempId ? (data as PlaylistItem) : item,
       ),
     );
-    setBusyMediaId(null);
+    setBusyItemId(null);
     await touchPlaylist();
+    refreshAssignedScreens();
+    markSaved();
+  }
+
+  async function handleChangeItem(
+    itemId: string,
+    mediaItem: Media,
+    duration: number,
+    clipStart: number,
+  ) {
+    if (!canEdit || busyItemId) {
+      return;
+    }
+
+    const existing = items.find((item) => item.id === itemId);
+
+    if (!existing || existing.id.startsWith("item-")) {
+      return;
+    }
+
+    const previousItems = items;
+    const optimistic: PlaylistItem = {
+      ...existing,
+      media_id: mediaItem.id,
+      duration,
+      clip_start: clipStart,
+    };
+
+    setError(null);
+    setBusyItemId(itemId);
+    setItems((current) =>
+      current.map((item) => (item.id === itemId ? optimistic : item)),
+    );
+    markSaving();
+
+    const { error: saveError } = await supabase
+      .from("playlist_items")
+      .upsert(
+        {
+          id: existing.id,
+          playlist_id: playlist.id,
+          media_id: mediaItem.id,
+          position: existing.position,
+          duration,
+          clip_start: clipStart,
+        },
+        { onConflict: "id" },
+      );
+
+    if (saveError) {
+      setItems(previousItems);
+      setError(saveError.message);
+      setSaveState("idle");
+      setBusyItemId(null);
+      return;
+    }
+
+    setBusyItemId(null);
+    await touchPlaylist();
+    refreshAssignedScreens();
+    markSaved();
+  }
+
+  async function handleUpdateClip(itemId: string, start: number) {
+    if (!canEdit || busyItemId) {
+      return;
+    }
+
+    const existing = items.find((item) => item.id === itemId);
+
+    if (!existing || existing.id.startsWith("item-")) {
+      return;
+    }
+
+    const previousItems = items;
+    const optimistic: PlaylistItem = {
+      ...existing,
+      duration: CLIP_LENGTH,
+      clip_start: start,
+    };
+
+    setError(null);
+    setBusyItemId(itemId);
+    setItems((current) =>
+      current.map((item) => (item.id === itemId ? optimistic : item)),
+    );
+    markSaving();
+
+    const { error: saveError } = await supabase
+      .from("playlist_items")
+      .upsert(
+        {
+          id: existing.id,
+          playlist_id: playlist.id,
+          media_id: existing.media_id,
+          position: existing.position,
+          duration: CLIP_LENGTH,
+          clip_start: start,
+        },
+        { onConflict: "id" },
+      );
+
+    if (saveError) {
+      setItems(previousItems);
+      setError(saveError.message);
+      setSaveState("idle");
+      setBusyItemId(null);
+      return;
+    }
+
+    setBusyItemId(null);
+    await touchPlaylist();
+    refreshAssignedScreens();
     markSaved();
   }
 
   async function handleRemoveItem(itemId: string) {
-    if (!canEdit || itemId.startsWith("item-")) {
+    if (!canEdit || busyItemId || itemId.startsWith("item-")) {
       return;
     }
 
@@ -537,111 +796,136 @@ export default function PlaylistEditor({
       return;
     }
 
-    if (remaining.length > 0) {
-      const rows = remaining.map((item) => ({
-        id: item.id,
-        playlist_id: playlist.id,
-        media_id: item.media_id,
-        position: item.position,
-        duration: item.duration ?? null,
-      }));
+    const upsertError = await persistPositions(remaining);
 
-      const { error: positionError } = await supabase
-        .from("playlist_items")
-        .upsert(rows, { onConflict: "id" });
-
-      if (positionError) {
-        setError(positionError.message);
-        setSaveState("idle");
-        setBusyItemId(null);
-        return;
-      }
+    if (upsertError) {
+      setError(upsertError.message);
+      setSaveState("idle");
+      setBusyItemId(null);
+      return;
     }
 
     setBusyItemId(null);
     await touchPlaylist();
+    refreshAssignedScreens();
     markSaved();
   }
 
-  function handleDurationInput(itemId: string, value: string) {
+  function openPicker(state: PickerState) {
+    if (!canEdit || (state?.mode === "add" && isFull)) {
+      return;
+    }
+
+    setPicker(state);
+  }
+
+  function applySelection(
+    mediaItem: Media,
+    duration: number,
+    clipStart: number,
+    target: { mode: "add" } | { mode: "change"; itemId: string },
+  ) {
+    if (target.mode === "change") {
+      void handleChangeItem(target.itemId, mediaItem, duration, clipStart);
+      return;
+    }
+
+    void handleAddItem(mediaItem, duration, clipStart);
+  }
+
+  function handlePickerPick(mediaItem: Media, resolvedLength: number | null) {
+    const current = picker;
+
+    if (!current) {
+      return;
+    }
+
+    setPicker(null);
+
+    const length =
+      mediaItem.type === "video"
+        ? resolvedLength && resolvedLength > 0
+          ? resolvedLength
+          : mediaItem.duration && mediaItem.duration > 0
+            ? mediaItem.duration
+            : null
+        : CLIP_LENGTH;
+
+    if (mediaItem.type === "video" && length === null) {
+      setError("Could not read this video's length. Please try again.");
+      return;
+    }
+
+    if (
+      mediaItem.type === "video" &&
+      length !== null &&
+      length > CLIP_LENGTH
+    ) {
+      const clipMedia: Media = { ...mediaItem, duration: length };
+
+      if (current.mode === "change") {
+        setClipState({
+          mode: "change",
+          itemId: current.itemId,
+          media: clipMedia,
+          initialStart: 0,
+        });
+      } else {
+        setClipState({
+          mode: "add",
+          media: clipMedia,
+          initialStart: 0,
+        });
+      }
+
+      return;
+    }
+
     const duration =
-      value.trim() === "" ? null : Number(value);
+      mediaItem.type === "image"
+        ? CLIP_LENGTH
+        : Math.max(
+            1,
+            Math.min(
+              CLIP_LENGTH,
+              Math.round(length ?? CLIP_LENGTH),
+            ),
+          );
 
-    setItems((current) =>
-      current.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              duration:
-                duration !== null && Number.isFinite(duration)
-                  ? duration
-                  : null,
-            }
-          : item,
-      ),
-    );
+    applySelection(mediaItem, duration, 0, current);
   }
 
-  async function handleDurationCommit(itemId: string, value: string) {
-    if (!canEdit) {
+  function handleClipConfirm(start: number) {
+    const current = clipState;
+
+    if (!current) {
       return;
     }
 
-    const item = items.find((entry) => entry.id === itemId);
+    setClipState(null);
 
-    if (!item) {
+    if (current.mode === "edit") {
+      void handleUpdateClip(current.itemId, start);
       return;
     }
 
-    if (item.id.startsWith("item-")) {
+    if (current.mode === "change") {
+      applySelection(current.media, CLIP_LENGTH, start, {
+        mode: "change",
+        itemId: current.itemId,
+      });
       return;
     }
 
-    const mediaItem = mediaById.get(item.media_id);
+    applySelection(current.media, CLIP_LENGTH, start, { mode: "add" });
+  }
 
-    if (mediaItem?.type === "video") {
-      return;
-    }
-
-    const parsed = value.trim() === "" ? null : Number(value);
-    const next =
-      parsed === null || !Number.isFinite(parsed)
-        ? null
-        : Math.min(600, Math.max(1, Math.round(parsed)));
-
-    if ((item.duration ?? null) === next) {
-      setItems((current) =>
-        current.map((entry) =>
-          entry.id === itemId ? { ...entry, duration: next } : entry,
-        ),
-      );
-      return;
-    }
-
-    const previousItems = items;
-
-    setError(null);
-    setItems((current) =>
-      current.map((entry) =>
-        entry.id === itemId ? { ...entry, duration: next } : entry,
+  function handleDurationResolved(mediaId: string, duration: number) {
+    setMediaList((current) =>
+      current.map((item) =>
+        item.id === mediaId ? { ...item, duration } : item,
       ),
     );
-    markSaving();
-
-    const { error: updateError } = await supabase
-      .from("playlist_items")
-      .update({ duration: next })
-      .eq("id", itemId);
-
-    if (updateError) {
-      setItems(previousItems);
-      setError(updateError.message);
-      setSaveState("idle");
-      return;
-    }
-
-    await touchPlaylist();
-    markSaved();
   }
 
   async function handleNameCommit() {
@@ -797,9 +1081,8 @@ export default function PlaylistEditor({
               </h1>
             )}
             <p className="mt-1 text-xs text-muted">
-              {sortedItems.length}{" "}
-              {sortedItems.length === 1 ? "item" : "items"} ·{" "}
-              {formatDuration(totalDuration)} total
+              {sortedItems.length} of {MAX_SLOTS} slots · Loop{" "}
+              {formatLoopTime(loopSeconds)}
             </p>
           </div>
         </div>
@@ -836,170 +1119,52 @@ export default function PlaylistEditor({
         </p>
       ) : null}
 
-      <div
-        className={cn(
-          "grid gap-5",
-          canEdit
-            ? "lg:grid-cols-[260px_minmax(0,1fr)_280px] xl:grid-cols-[280px_minmax(0,1fr)_300px]"
-            : "lg:grid-cols-[minmax(0,1fr)_300px]",
-        )}
-      >
-        {canEdit ? (
-          <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => setLibraryOpen((open) => !open)}
-            aria-expanded={libraryOpen}
-            className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-surface px-4 py-3 text-sm font-semibold text-white transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 lg:hidden"
-          >
-            <span className="flex items-center gap-2">
-              <Images aria-hidden="true" className="h-4 w-4 text-brand-sky" />
-              Media library
-            </span>
-            {libraryOpen ? (
-              <ChevronUp aria-hidden="true" className="h-4 w-4" />
-            ) : (
-              <ChevronDown aria-hidden="true" className="h-4 w-4" />
-            )}
-          </button>
-
-          <Card
-            className={cn(
-              "overflow-hidden p-0 lg:sticky lg:top-24",
-              !libraryOpen && "hidden lg:block",
-            )}
-          >
-            <div className="border-b border-white/5 px-4 py-4">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-white">
-                  Media library
-                </h2>
-                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-muted tabular-nums">
-                  {media.length}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <Card className="flex flex-col overflow-hidden p-0">
+          <div className="flex flex-col gap-3 border-b border-white/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Slot board</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                <span>
+                  Slots:{" "}
+                  <span className="font-semibold tabular-nums text-white">
+                    {sortedItems.length} / {MAX_SLOTS}
+                  </span>
+                </span>
+                <span>
+                  Loop time:{" "}
+                  <span className="font-semibold tabular-nums text-white">
+                    {formatLoopTime(loopSeconds)}
+                  </span>
                 </span>
               </div>
-
-              <div className="relative mt-3">
-                <Search
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted"
-                />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search media"
-                  aria-label="Search media"
-                  className="h-9 w-full rounded-full border border-white/10 bg-white/5 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40"
-                />
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {MEDIA_FILTERS.map((entry) => (
-                  <button
-                    key={entry.value}
-                    type="button"
-                    onClick={() => setFilter(entry.value)}
-                    aria-pressed={filter === entry.value}
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
-                      filter === entry.value
-                        ? "border-sky-400/40 bg-sky-400/10 text-sky-100"
-                        : "border-white/10 bg-white/5 text-muted hover:border-white/20 hover:text-white",
-                    )}
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            <div className="max-h-[420px] overflow-y-auto p-3 lg:max-h-[calc(100vh-16rem)]">
-              {media.length === 0 ? (
-                <div className="px-2 py-10 text-center">
-                  <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-brand-sky">
-                    <Images aria-hidden="true" className="h-5 w-5" />
-                  </span>
-                  <p className="mt-3 text-sm font-medium text-white">
-                    Upload media first
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-body">
-                    Add images and videos to your library, then come back to
-                    build this playlist.
-                  </p>
-                  <Link
-                    href="/dashboard/media"
-                    className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                  >
-                    Upload media
-                  </Link>
-                </div>
-              ) : filteredMedia.length === 0 ? (
-                <p className="px-2 py-10 text-center text-sm text-body">
-                  No media matches your search.
-                </p>
-              ) : (
-                <ul className="grid grid-cols-2 gap-2">
-                  {filteredMedia.map((mediaItem) => {
-                    const isBusy = busyMediaId === mediaItem.id;
-
-                    return (
-                      <li key={mediaItem.id}>
-                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-                          <div className="relative aspect-video bg-black/40">
-                            <MediaPreview item={mediaItem} />
-                            <button
-                              type="button"
-                              onClick={() => void handleAddItem(mediaItem)}
-                              disabled={Boolean(busyMediaId)}
-                              aria-label={`Add ${mediaItem.name} to playlist`}
-                              className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full brand-gradient text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-60"
-                            >
-                              {isBusy ? (
-                                <Loader2
-                                  aria-hidden="true"
-                                  className="h-3.5 w-3.5 animate-spin"
-                                />
-                              ) : (
-                                <Plus
-                                  aria-hidden="true"
-                                  className="h-3.5 w-3.5"
-                                />
-                              )}
-                            </button>
-                          </div>
-                          <div className="px-2 py-1.5">
-                            <p className="truncate text-xs font-medium text-white">
-                              {mediaItem.name}
-                            </p>
-                            <p className="text-[10px] uppercase tracking-[0.12em] text-muted">
-                              {mediaItem.type === "video" ? "Video" : "Image"}
-                            </p>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </Card>
+            {canEdit ? (
+              <Button
+                size="sm"
+                onClick={() => openPicker({ mode: "add" })}
+                disabled={isFull}
+                className="shrink-0 gap-2"
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                {isFull ? "Maximum 10 slots reached" : "Add content"}
+              </Button>
+            ) : null}
           </div>
-        ) : null}
 
-        <Card className="flex flex-col overflow-hidden p-0">
-          <div className="border-b border-white/5 px-4 py-4 sm:px-5">
-            <h2 className="text-sm font-semibold text-white">
-              Playlist timeline
-            </h2>
-            <p className="mt-1 text-xs text-muted">
-              {canEdit
-                ? "Drag to reorder. Duration changes save when you leave the field."
-                : "The order these items play on screen."}
+          {hasOverflow ? (
+            <p className="mx-4 mt-4 flex items-start gap-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-200 sm:mx-5">
+              <AlertTriangle
+                aria-hidden="true"
+                className="mt-0.5 h-4 w-4 shrink-0"
+              />
+              This playlist has more than 10 slots. Remove extra slots to add
+              new ones.
             </p>
-          </div>
+          ) : null}
 
-          {sortedItems.length === 0 ? (
+          {!canEdit && sortedItems.length === 0 ? (
             <div className="px-5 py-16 text-center">
               <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-brand-sky">
                 <ListVideo aria-hidden="true" className="h-6 w-6" />
@@ -1008,9 +1173,7 @@ export default function PlaylistEditor({
                 This playlist is empty
               </h3>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-body">
-                {canEdit
-                  ? "Add images and videos from your library to start building the loop."
-                  : "This playlist has no items yet."}
+                This playlist has no items yet.
               </p>
             </div>
           ) : (
@@ -1021,29 +1184,53 @@ export default function PlaylistEditor({
             >
               <SortableContext
                 items={sortedItems.map((item) => item.id)}
-                strategy={verticalListSortingStrategy}
+                strategy={rectSortingStrategy}
               >
-                <ul className="space-y-2 p-3 sm:p-4">
-                  {sortedItems.map((item, index) => {
+                <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
+                  {Array.from({ length: gridSlots }).map((_, index) => {
+                    const item = sortedItems[index];
+
+                    if (!item) {
+                      return (
+                        <EmptySlotCard
+                          key={`empty-${index}`}
+                          slotNumber={index + 1}
+                          disabled={isFull}
+                          onAdd={() => openPicker({ mode: "add" })}
+                        />
+                      );
+                    }
+
                     const mediaItem = mediaById.get(item.media_id);
 
                     return (
-                      <SortableItemRow
+                      <SortableSlotCard
                         key={item.id}
                         item={item}
-                        index={index}
+                        slotNumber={index + 1}
                         mediaItem={mediaItem}
                         busy={busyItemId === item.id}
                         canEdit={canEdit}
-                        onRemove={(itemId) => void handleRemoveItem(itemId)}
-                        onDurationInput={handleDurationInput}
-                        onDurationCommit={(itemId, value) =>
-                          void handleDurationCommit(itemId, value)
+                        onChange={() =>
+                          openPicker({ mode: "change", itemId: item.id })
                         }
+                        onEditClip={() => {
+                          if (!mediaItem) {
+                            return;
+                          }
+
+                          setClipState({
+                            mode: "edit",
+                            itemId: item.id,
+                            media: mediaItem,
+                            initialStart: item.clip_start ?? 0,
+                          });
+                        }}
+                        onRemove={() => void handleRemoveItem(item.id)}
                       />
                     );
                   })}
-                </ul>
+                </div>
               </SortableContext>
             </DndContext>
           )}
@@ -1152,6 +1339,26 @@ export default function PlaylistEditor({
           )}
         </Card>
       </div>
+
+      {picker && canEdit ? (
+        <ContentPicker
+          media={mediaList}
+          canEdit={canEdit}
+          title={picker.mode === "add" ? "Add content" : "Change content"}
+          onClose={() => setPicker(null)}
+          onPick={handlePickerPick}
+          onDurationResolved={handleDurationResolved}
+        />
+      ) : null}
+
+      {clipState ? (
+        <ClipDialog
+          media={clipState.media}
+          initialStart={clipState.initialStart}
+          onCancel={() => setClipState(null)}
+          onConfirm={handleClipConfirm}
+        />
+      ) : null}
     </div>
   );
 }

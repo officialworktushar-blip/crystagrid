@@ -44,7 +44,9 @@ export default async function PlaylistDetailPage({
     await Promise.all([
       supabase
         .from("playlist_items")
-        .select("id, playlist_id, media_id, position, duration, created_at")
+        .select(
+          "id, playlist_id, media_id, position, duration, clip_start, created_at",
+        )
         .eq("playlist_id", id)
         .order("position", { ascending: true }),
       supabase

@@ -1032,7 +1032,9 @@ export default function BookWizard() {
                             <button
                               type="button"
                               onClick={() =>
-                                selected ? removeItem(item) : addPackage(item)
+                                selected
+                                  ? removeItem({ type: "package", id: item.id })
+                                  : addPackage(item)
                               }
                               className={cn(
                                 "mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-bold transition",

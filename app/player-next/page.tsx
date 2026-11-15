@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import NextImage from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
@@ -232,7 +232,7 @@ function usePlayableUrl(url: string | null): string | null {
 function BrandLogo() {
   return (
     <div className="flex items-center gap-3">
-      <Image
+      <NextImage
         src="/logo.webp"
         alt=""
         width={48}

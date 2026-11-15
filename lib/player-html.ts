@@ -1,4 +1,8 @@
-export function buildPlayerHtml(supabaseUrl: string, anonKey: string): string {
+export function buildPlayerHtml(
+  supabaseUrl: string,
+  anonKey: string,
+  version: string,
+): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -41,10 +45,15 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
 
   var SUPABASE_URL = ${JSON.stringify(supabaseUrl)};
   var ANON_KEY = ${JSON.stringify(anonKey)};
+  var PLAYER_VERSION = ${JSON.stringify(version)};
   var TOKEN_KEY = "crystagrid_device_token";
   var CODE_KEY = "crystagrid_player_code";
   var EXPIRES_KEY = "crystagrid_player_expires_at";
   var PLAYLIST_KEY = "crystagrid_last_playlist";
+  var VERSION_RELOAD_KEY = "crystagrid_player_version_reload";
+  var VERSION_CHECK_INTERVAL_MS = 60000;
+  var VERSION_RELOAD_COOLDOWN_MS = 300000;
+  var versionReloadAt = 0;
   var NEWLINE = String.fromCharCode(10);
 
   var pairScreen = document.getElementById("pairScreen");
@@ -113,6 +122,26 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
         return;
       }
       window.localStorage.removeItem(key);
+    } catch (e) {}
+  }
+
+  function sessionStorageGet(key) {
+    try {
+      if (!window.sessionStorage) {
+        return null;
+      }
+      return window.sessionStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function sessionStorageSet(key, value) {
+    try {
+      if (!window.sessionStorage) {
+        return;
+      }
+      window.sessionStorage.setItem(key, value);
     } catch (e) {}
   }
 
@@ -202,7 +231,25 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
         duration = parsed;
       }
     }
-    return { id: id, type: type, file_path: filePath, duration: duration };
+    var clipStart = 0;
+    if (typeof value.clip_start === "number" && isFinite(value.clip_start)) {
+      clipStart = value.clip_start;
+    } else if (typeof value.clip_start === "string" && value.clip_start !== "") {
+      var parsedClipStart = Number(value.clip_start);
+      if (isFinite(parsedClipStart)) {
+        clipStart = parsedClipStart;
+      }
+    }
+    if (clipStart < 0) {
+      clipStart = 0;
+    }
+    return {
+      id: id,
+      type: type,
+      file_path: filePath,
+      duration: duration,
+      clip_start: clipStart,
+    };
   }
 
   function parsePollResponse(data) {
@@ -236,9 +283,43 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
   function makeSignature(list) {
     var parts = [];
     for (var i = 0; i < list.length; i++) {
-      parts.push(String(list[i].id) + "|" + String(list[i].file_path) + "|" + String(list[i].duration));
+      parts.push(
+        String(list[i].id) +
+          "|" +
+          String(list[i].file_path) +
+          "|" +
+          String(list[i].duration) +
+          "|" +
+          String(list[i].clip_start)
+      );
     }
     return "n=" + list.length + ";" + parts.join(";");
+  }
+
+  function clampDuration(value) {
+    var seconds = typeof value === "number" && isFinite(value) ? value : 10;
+    if (seconds < 1) {
+      seconds = 1;
+    }
+    if (seconds > 10) {
+      seconds = 10;
+    }
+    return seconds;
+  }
+
+  function clampClipStart(value) {
+    var start = typeof value === "number" && isFinite(value) ? value : 0;
+    if (start < 0) {
+      start = 0;
+    }
+    return start;
+  }
+
+  function formatSeconds(value) {
+    if (typeof value !== "number" || !isFinite(value)) {
+      return "--";
+    }
+    return value.toFixed(2);
   }
 
   function mediaUrl(filePath) {
@@ -394,7 +475,17 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
       return;
     }
     var item = items.length > 0 ? items[currentIndex % items.length] : null;
+    var clipStart = item ? clampClipStart(item.clip_start) : 0;
+    var slotDuration = item ? clampDuration(item.duration) : 0;
+    var videoTime = "--";
+    if (currentElement) {
+      var currentTag = currentElement.tagName ? currentElement.tagName.toLowerCase() : "";
+      if (currentTag === "video") {
+        videoTime = formatSeconds(currentElement.currentTime);
+      }
+    }
     var lines = [];
+    lines.push("version: " + PLAYER_VERSION);
     lines.push("state: " + state);
     lines.push("screen: " + (screenName ? screenName : "--"));
     lines.push("token: " + (token ? token.substring(0, 6) : "--"));
@@ -402,6 +493,9 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
     lines.push("item: " + (items.length > 0 ? (currentIndex % items.length) + 1 : 0) + "/" + items.length);
     lines.push("type: " + (item ? item.type : "--"));
     lines.push("file: " + (item ? shortName(item.file_path) : "--"));
+    lines.push("clip start: " + (item ? formatSeconds(clipStart) : "--"));
+    lines.push("video time: " + videoTime);
+    lines.push("end at: " + (item ? formatSeconds(clipStart + slotDuration) : "--"));
     lines.push("media: " + mediaSize());
     lines.push("window: " + window.innerWidth + "x" + window.innerHeight);
     lines.push("dpr: " + (window.devicePixelRatio || 1));
@@ -426,6 +520,9 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
       node.onerror = null;
       node.oncanplay = null;
       node.onended = null;
+      node.ontimeupdate = null;
+      node.onloadedmetadata = null;
+      node.onseeked = null;
     } catch (e) {}
     try {
       var tag = node.tagName ? node.tagName.toLowerCase() : "";
@@ -506,6 +603,51 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
     playCurrent(playToken);
   }
 
+  function restartVideo(element, clipStart) {
+    if (!element) {
+      return;
+    }
+    try {
+      element.currentTime = clipStart;
+    } catch (e) {
+      return;
+    }
+    try {
+      var playResult = element.play();
+      if (playResult && typeof playResult.catch === "function") {
+        playResult.catch(function () {});
+      }
+    } catch (e2) {}
+  }
+
+  function scheduleVideoSafety(item, element, tokenValue, isSingle) {
+    if (safetyTimer) {
+      clearTimeout(safetyTimer);
+      safetyTimer = null;
+    }
+    safetyTimer = setTimeout(function () {
+      if (tokenValue !== playToken || currentElement !== element) {
+        return;
+      }
+      handleVideoEnd(item, element, tokenValue, isSingle);
+    }, (clampDuration(item.duration) + 6) * 1000);
+  }
+
+  function handleVideoEnd(item, element, tokenValue, isSingle) {
+    if (tokenValue !== playToken) {
+      return;
+    }
+    if (currentElement !== element) {
+      return;
+    }
+    if (isSingle) {
+      restartVideo(element, clampClipStart(item.clip_start));
+      scheduleVideoSafety(item, element, tokenValue, isSingle);
+      return;
+    }
+    advance(tokenValue);
+  }
+
   function scheduleItemTimers(item, element, tokenValue, isSingle) {
     clearItemTimers();
 
@@ -513,10 +655,7 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
       if (isSingle) {
         return;
       }
-      var seconds = item.duration;
-      if (typeof seconds !== "number" || !isFinite(seconds) || seconds < 1) {
-        seconds = 10;
-      }
+      var seconds = clampDuration(item.duration);
       itemTimer = setTimeout(function () {
         if (tokenValue !== playToken) {
           return;
@@ -527,28 +666,13 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
     }
 
     if (item.type === "video") {
-      if (isSingle) {
-        return;
-      }
       if (element.ended) {
         setTimeout(function () {
-          advance(tokenValue);
+          handleVideoEnd(item, element, tokenValue, isSingle);
         }, 0);
         return;
       }
-      var duration = element.duration;
-      var wait;
-      if (typeof duration === "number" && isFinite(duration) && duration > 0) {
-        wait = (duration + 15) * 1000;
-      } else {
-        wait = 10 * 60 * 1000;
-      }
-      safetyTimer = setTimeout(function () {
-        if (tokenValue !== playToken) {
-          return;
-        }
-        advance(tokenValue);
-      }, wait);
+      scheduleVideoSafety(item, element, tokenValue, isSingle);
     }
   }
 
@@ -561,6 +685,10 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
 
     var item = items[currentIndex % items.length];
     var isSingle = items.length === 1;
+    var clipStart = clampClipStart(item.clip_start);
+    var slotDuration = clampDuration(item.duration);
+    var endAt = clipStart + slotDuration;
+    var wrapping = false;
     var nextLayer = idleLayer;
     var element = null;
     var transitioned = false;
@@ -670,20 +798,47 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
       element.setAttribute("playsinline", "");
       element.setAttribute("webkit-playsinline", "");
       element.setAttribute("preload", "auto");
-      if (isSingle) {
-        element.loop = true;
-        element.setAttribute("loop", "loop");
-      }
+      element.onloadedmetadata = function () {
+        if (clipStart > 0) {
+          try {
+            element.currentTime = clipStart;
+          } catch (e) {}
+        }
+      };
       element.oncanplay = function () {
+        if (clipStart > 0 && element.currentTime < clipStart) {
+          try {
+            element.currentTime = clipStart;
+          } catch (e) {}
+        }
         doTransition();
       };
       element.onerror = function () {
         handleError();
       };
       element.onended = function () {
-        if (tokenValue === playToken && currentElement === element) {
-          advance(tokenValue);
+        handleVideoEnd(item, element, tokenValue, isSingle);
+      };
+      element.ontimeupdate = function () {
+        if (tokenValue !== playToken || currentElement !== element) {
+          return;
         }
+        if (element.currentTime < endAt - 0.15) {
+          return;
+        }
+        if (isSingle) {
+          if (wrapping) {
+            return;
+          }
+          wrapping = true;
+          restartVideo(element, clipStart);
+          scheduleVideoSafety(item, element, tokenValue, isSingle);
+          return;
+        }
+        advance(tokenValue);
+      };
+      element.onseeked = function () {
+        wrapping = false;
       };
       element.src = mediaUrl(item.file_path);
       nextLayer.appendChild(element);
@@ -965,6 +1120,60 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
     });
   }
 
+  function readVersionReloadAt() {
+    var raw = sessionStorageGet(VERSION_RELOAD_KEY);
+    var value = raw ? Number(raw) : 0;
+    if (!isFinite(value) || value < 0) {
+      value = 0;
+    }
+    if (versionReloadAt > value) {
+      value = versionReloadAt;
+    }
+    return value;
+  }
+
+  function checkVersion() {
+    var xhr = new XMLHttpRequest();
+    try {
+      xhr.open("GET", "/player/version?ts=" + new Date().getTime(), true);
+    } catch (e) {
+      return;
+    }
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) {
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        return;
+      }
+      var data = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch (e) {
+        return;
+      }
+      if (!data || typeof data.v !== "string" || data.v === PLAYER_VERSION) {
+        return;
+      }
+      var now = new Date().getTime();
+      var lastReload = readVersionReloadAt();
+      if (lastReload && now - lastReload < VERSION_RELOAD_COOLDOWN_MS) {
+        return;
+      }
+      versionReloadAt = now;
+      sessionStorageSet(VERSION_RELOAD_KEY, String(now));
+      try {
+        window.location.reload();
+      } catch (e2) {}
+    };
+    xhr.onerror = function () {};
+    xhr.ontimeout = function () {};
+    try {
+      xhr.send();
+    } catch (e3) {}
+  }
+
   function boot() {
     token = storageGet(TOKEN_KEY);
     code = storageGet(CODE_KEY);
@@ -988,6 +1197,8 @@ body { font-family: Arial, Helvetica, sans-serif; color: #fff; cursor: none; }
     setInterval(function () {
       refreshDebug();
     }, 1000);
+
+    setInterval(checkVersion, VERSION_CHECK_INTERVAL_MS);
   }
 
   window.onerror = function (message, source, line) {

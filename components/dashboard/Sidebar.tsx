@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import {
   ArrowLeft,
+  CalendarCheck,
   Images,
   LayoutDashboard,
   ListVideo,
+  Megaphone,
   Monitor,
   X,
   type LucideIcon,
@@ -23,6 +25,8 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { label: "My Plans", href: "/dashboard/plans", icon: CalendarCheck },
+  { label: "Book Ads", href: "/book", icon: Megaphone },
   { label: "My Screens", href: "/dashboard/screens", icon: Monitor },
   { label: "Media", href: "/dashboard/media", icon: Images },
   { label: "Playlists", href: "/dashboard/playlists", icon: ListVideo },

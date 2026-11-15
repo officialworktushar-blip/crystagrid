@@ -1,16 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import Button from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 
 const inputClass =
   "h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40";
 
-export default function RegisterPage() {
+function resolveSafeNext(value: string | null): string | null {
+  if (
+    !value ||
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\") ||
+    value.includes("://")
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+function RegisterFallback() {
+  return <div aria-hidden="true" className="min-h-[520px]" />;
+}
+
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const loginHref = nextParam
+    ? `/login?next=${encodeURIComponent(nextParam)}`
+    : "/login";
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -56,7 +79,27 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/dashboard");
+      const safeNext = resolveSafeNext(nextParam);
+      let destination = "/dashboard";
+
+      if (data.user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        const profile = profileData as { role?: string } | null;
+
+        if (profile?.role === "admin") {
+          destination = "/admin";
+        } else if (profile?.role === "manager") {
+          destination = "/manage";
+        } else if (profile?.role === "customer" && safeNext) {
+          destination = safeNext;
+        }
+      }
+
+      router.push(destination);
       router.refresh();
     } finally {
       setLoading(false);
@@ -184,12 +227,20 @@ export default function RegisterPage() {
       <p className="mt-6 text-center text-sm text-body">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href={loginHref}
           className="font-medium text-brand-sky transition duration-200 hover:text-white"
         >
           Sign in
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterFallback />}>
+      <RegisterForm />
+    </Suspense>
   );
 }

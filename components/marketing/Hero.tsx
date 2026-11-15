@@ -36,7 +36,7 @@ export default function Hero() {
             withArrow
             className="h-14 w-full px-8 text-lg sm:w-auto"
           >
-            <Link href="/register">Start Free</Link>
+            <Link href="/book">Book CrystaGrid Ads</Link>
           </Button>
           <Button
             asChild

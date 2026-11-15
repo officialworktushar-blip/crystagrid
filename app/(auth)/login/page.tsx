@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import Button from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 
@@ -10,28 +10,30 @@ const inputClass =
   "h-12 w-full rounded-full border border-white/10 bg-white/5 px-5 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40";
 
 function resolveSafeNext(value: string | null): string | null {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+  if (
+    !value ||
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\") ||
+    value.includes("://")
+  ) {
     return null;
   }
 
-  try {
-    const target = new URL(value, window.location.origin);
-
-    if (
-      target.origin !== window.location.origin ||
-      !target.pathname.startsWith("/")
-    ) {
-      return null;
-    }
-
-    return `${target.pathname}${target.search}${target.hash}`;
-  } catch {
-    return null;
-  }
+  return value;
 }
 
-export default function LoginPage() {
+function LoginFallback() {
+  return <div aria-hidden="true" className="min-h-[430px]" />;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const registerHref = nextParam
+    ? `/register?next=${encodeURIComponent(nextParam)}`
+    : "/register";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,10 +57,7 @@ export default function LoginPage() {
         return;
       }
 
-      const requestedNext = new URLSearchParams(window.location.search).get(
-        "next",
-      );
-      const safeNext = resolveSafeNext(requestedNext);
+      const safeNext = resolveSafeNext(nextParam);
       let destination = "/dashboard";
 
       if (signInData.user) {
@@ -73,7 +72,7 @@ export default function LoginPage() {
           destination = "/admin";
         } else if (profile?.role === "manager") {
           destination = "/manage";
-        } else if (safeNext) {
+        } else if (profile?.role === "customer" && safeNext) {
           destination = safeNext;
         }
       }
@@ -156,12 +155,20 @@ export default function LoginPage() {
       <p className="mt-6 text-center text-sm text-body">
         Don&apos;t have an account?{" "}
         <Link
-          href="/register"
+          href={registerHref}
           className="font-medium text-brand-sky transition duration-200 hover:text-white"
         >
           Create one
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginForm />
+    </Suspense>
   );
 }

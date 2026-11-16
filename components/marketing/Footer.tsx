@@ -26,9 +26,9 @@ export default function Footer() {
               <Image
                 src="/logo.webp"
                 alt=""
-                width={128}
-                height={128}
-                className="h-20 w-auto max-w-36 shrink-0 object-contain"
+                width={256}
+                height={256}
+                className="h-40 w-auto max-w-72 shrink-0 object-contain"
               />
             </Link>
             <p className="mt-4 text-sm leading-6 text-body">

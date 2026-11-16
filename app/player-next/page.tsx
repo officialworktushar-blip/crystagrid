@@ -235,10 +235,9 @@ function BrandLogo() {
       <NextImage
         src="/logo.webp"
         alt="Crystagrid"
-        width={320}
-        height={320}
-        loading="eager"
-        className="h-36 w-auto max-w-[82vw] shrink-0 object-contain sm:h-44 md:h-48"
+        width={640}
+        height={640}
+        className="h-20 w-auto object-contain"
       />
     </div>
   );

@@ -100,10 +100,9 @@ export default function Sidebar({
               <Image
                 src="/logo.webp"
                 alt=""
-                width={128}
-                height={128}
-                loading="eager"
-                className="h-16 w-auto max-w-36 shrink-0 object-contain"
+                width={256}
+                height={256}
+                className="h-20 w-auto max-w-72 shrink-0 object-contain"
               />
             </Link>
 

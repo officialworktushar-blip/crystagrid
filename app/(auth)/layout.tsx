@@ -22,10 +22,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <Image
               src="/logo.webp"
               alt=""
-              width={192}
-              height={192}
-              loading="eager"
-              className="h-32 w-auto max-w-[70vw] shrink-0 object-contain"
+              width={384}
+              height={384}
+              className="h-20 w-auto object-contain"
             />
           </Link>
         </div>

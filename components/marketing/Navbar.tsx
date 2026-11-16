@@ -7,51 +7,7 @@ import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
-const solutions = [
-  { href: "#digital-signage", label: "Digital Signage" },
-  { href: "#menu-boards", label: "Menu Boards" },
-  { href: "#corporate-displays", label: "Corporate Displays" },
-];
 
-function SolutionsMenu() {
-  return (
-    <div className="group relative">
-      <button
-        type="button"
-        aria-haspopup="true"
-        className="flex items-center gap-1.5 text-lg font-medium text-white transition duration-200 hover:text-sky-400 focus-visible:text-sky-400 focus-visible:outline-none"
-      >
-        Solutions
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4 transition-transform duration-200 group-hover:rotate-180 group-focus-within:rotate-180"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-
-      <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-4 opacity-0 transition duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-        <div className="w-56 rounded-2xl border border-white/10 bg-[#020617]/95 p-2 shadow-card backdrop-blur-lg">
-          {solutions.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block rounded-xl px-3 py-2 text-sm font-medium text-white/70 transition duration-200 hover:bg-white/5 hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -144,22 +100,12 @@ export default function Navbar() {
             </Link>
 
             <Link
-              href="#features"
-              aria-current={isActive("#features") ? "page" : undefined}
-              className={linkClass(isActive("#features"))}
+              href="#about"
+              aria-current={isActive("#about") ? "page" : undefined}
+              className={linkClass(isActive("#about"))}
             >
-              Features
+              About Us
             </Link>
-
-            <Link
-              href="#how-it-works"
-              aria-current={isActive("#how-it-works") ? "page" : undefined}
-              className={linkClass(isActive("#how-it-works"))}
-            >
-              How it works
-            </Link>
-
-            <SolutionsMenu />
 
             <Link
               href="#pricing"
@@ -230,45 +176,13 @@ export default function Navbar() {
               </Link>
 
               <Link
-                href="#features"
-                aria-current={isActive("#features") ? "page" : undefined}
+                href="#about"
+                aria-current={isActive("#about") ? "page" : undefined}
                 onClick={() => setMobileOpen(false)}
-                className={mobileLinkClass(isActive("#features"))}
+                className={mobileLinkClass(isActive("#about"))}
               >
-                Features
+                About Us
               </Link>
-
-              <Link
-                href="#how-it-works"
-                aria-current={
-                  isActive("#how-it-works") ? "page" : undefined
-                }
-                onClick={() => setMobileOpen(false)}
-                className={mobileLinkClass(isActive("#how-it-works"))}
-              >
-                How it works
-              </Link>
-
-              <Link
-                href="#solutions"
-                onClick={() => setMobileOpen(false)}
-                className={mobileLinkClass(false)}
-              >
-                Solutions
-              </Link>
-
-              <div className="mb-1 ml-3 flex flex-col gap-1 border-l border-white/10 pl-3">
-                {solutions.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded-xl px-3 py-2 text-base font-medium text-white/60 transition duration-200 hover:bg-white/5 hover:text-white"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
 
               <Link
                 href="#pricing"

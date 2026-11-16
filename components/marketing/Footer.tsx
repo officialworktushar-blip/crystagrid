@@ -3,8 +3,7 @@ import Image from "next/image";
 
 const pageLinks = [
   { href: "/", label: "Home" },
-  { href: "#features", label: "Features" },
-  { href: "#how-it-works", label: "How it works" },
+  { href: "#about", label: "About Us" },
   { href: "#pricing", label: "Pricing" },
 ];
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Settings2 } from "lucide-react";
+import AdminCustomerDetailHeaderActions from "@/components/admin/AdminCustomerDetailHeaderActions";
 import AdminManagerSelect from "@/components/admin/AdminManagerSelect";
 import DeleteScreenButton from "@/components/admin/DeleteScreenButton";
 import StatusBadge from "@/components/dashboard/StatusBadge";
@@ -79,6 +80,8 @@ export default async function AdminCustomerDetailPage({
     customer.manager_name ||
     (assignedManager ? managerDisplayName(assignedManager) : null) ||
     "Unassigned";
+  const { data: authUserData } = await supabase.auth.getUser();
+  const currentAdminId = authUserData.user?.id ?? null;
 
   const [screensResult, playlistsResult, mediaResult] = await Promise.all([
     supabase
@@ -215,12 +218,19 @@ export default async function AdminCustomerDetailPage({
                   Managers could not be loaded. {managersError}
                 </p>
               ) : (
-                <AdminManagerSelect
-                  customerId={customer.customer_id}
-                  managerId={customer.manager_id}
-                  managers={managers}
-                  className="mt-2 w-full sm:w-56"
-                />
+                <>
+                  <AdminManagerSelect
+                    customerId={customer.customer_id}
+                    managerId={customer.manager_id}
+                    managers={managers}
+                    className="mt-2 w-full sm:w-56"
+                  />
+                  <AdminCustomerDetailHeaderActions
+                    customerId={customer.customer_id}
+                    managerId={customer.manager_id}
+                    currentAdminId={currentAdminId}
+                  />
+                </>
               )}
             </div>
 

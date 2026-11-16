@@ -1,5 +1,7 @@
 "use client";
 
+"use client";
+
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -73,6 +75,7 @@ export default function AdminManagerSelect({
         {managers.map((manager) => (
           <option key={manager.id} value={manager.id}>
             {managerDisplayName(manager)}
+            {manager.role === "admin" ? " (Admin)" : ""}
           </option>
         ))}
       </select>

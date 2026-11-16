@@ -14,6 +14,7 @@ export default async function ManageCustomersPage() {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_customer_stats");
   const customers = normalizeAdminCustomerStats(data);
+  const isAdmin = session.profile?.role === "admin";
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] px-4 py-8 sm:px-6 lg:px-8">
@@ -33,7 +34,8 @@ export default async function ManageCustomersPage() {
 
         <ManageCustomersClient
           customers={customers}
-          showManager={session.profile?.role === "admin"}
+          isAdmin={isAdmin}
+          currentUserId={session.user.id}
           loadError={error?.message ?? null}
         />
       </div>

@@ -13,7 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 
 export type AdminScreenRowWithCustomer = AdminScreenRow & {
-  customer_id: string;
+  customer_id: string | null;
+  owner_role?: string | null;
 };
 
 type ScreenFilter = "all" | "online" | "offline" | "pending";
@@ -178,16 +179,25 @@ export default function AdminScreensClient({
                       </p>
                     </td>
                     <td className="max-w-[16rem] px-4 py-3.5">
-                      <Link
-                        href={`/manage/${screen.customer_id}`}
-                        className="block truncate rounded-sm text-white/75 transition duration-200 hover:text-brand-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                      >
-                        {screen.owner_name}
-                      </Link>
+                      {screen.customer_id ? (
+                        <Link
+                          href={`/manage/${screen.customer_id}`}
+                          className="block truncate rounded-sm text-white/75 transition duration-200 hover:text-brand-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                        >
+                          {screen.owner_name}
+                        </Link>
+                      ) : (
+                        <span className="block truncate text-white/50">No owner</span>
+                      )}
                       {screen.owner_company ? (
                         <p className="mt-0.5 truncate text-xs text-muted">
                           {screen.owner_company}
                         </p>
+                      ) : null}
+                      {screen.owner_role === "admin" || screen.owner_role === "manager" ? (
+                        <span className="mt-1 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+                          {screen.owner_role === "admin" ? "Admin account" : "Manager account"}
+                        </span>
                       ) : null}
                     </td>
                     <td className="px-4 py-3.5">
@@ -201,12 +211,18 @@ export default function AdminScreensClient({
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link
-                          href={`/manage/${screen.customer_id}/screens`}
-                          className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition duration-200 hover:border-sky-400/30 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                        >
-                          Manage
-                        </Link>
+                        {screen.customer_id ? (
+                          <Link
+                            href={`/manage/${screen.customer_id}/screens`}
+                            className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition duration-200 hover:border-sky-400/30 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          >
+                            Manage
+                          </Link>
+                        ) : (
+                          <span className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/30">
+                            Manage
+                          </span>
+                        )}
                         <DeleteScreenButton
                           screenId={screen.id}
                           screenName={screen.name}
@@ -229,16 +245,23 @@ export default function AdminScreensClient({
                       {screen.name}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-body">
-                      <Link
-                        href={`/manage/${screen.customer_id}`}
-                        className="rounded-sm transition duration-200 hover:text-brand-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                      >
-                        {screen.owner_name}
-                      </Link>
-                      {screen.owner_company
-                        ? ` · ${screen.owner_company}`
-                        : ""}
+                      {screen.customer_id ? (
+                        <Link
+                          href={`/manage/${screen.customer_id}`}
+                          className="rounded-sm transition duration-200 hover:text-brand-sky focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                        >
+                          {screen.owner_name}
+                        </Link>
+                      ) : (
+                        <span className="text-white/50">No owner</span>
+                      )}
+                      {screen.owner_company ? ` · ${screen.owner_company}` : ""}
                     </p>
+                    {screen.owner_role === "admin" || screen.owner_role === "manager" ? (
+                      <span className="mt-1 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+                        {screen.owner_role === "admin" ? "Admin account" : "Manager account"}
+                      </span>
+                    ) : null}
                   </div>
                   <StatusBadge status={screen.display_status} />
                 </div>
@@ -259,12 +282,18 @@ export default function AdminScreensClient({
                     </div>
                   </dl>
                   <div className="flex flex-col items-end gap-1">
-                    <Link
-                      href={`/manage/${screen.customer_id}/screens`}
-                      className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition duration-200 hover:border-sky-400/30 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                    >
-                      Manage
-                    </Link>
+                    {screen.customer_id ? (
+                      <Link
+                        href={`/manage/${screen.customer_id}/screens`}
+                        className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/70 transition duration-200 hover:border-sky-400/30 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                      >
+                        Manage
+                      </Link>
+                    ) : (
+                      <span className="inline-flex h-8 items-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white/30">
+                        Manage
+                      </span>
+                    )}
                     <DeleteScreenButton
                       screenId={screen.id}
                       screenName={screen.name}

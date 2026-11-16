@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminTeamPage() {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_list_team");
+  const [{ data, error }, { data: userData }] = await Promise.all([
+    supabase.rpc("admin_list_team"),
+    supabase.auth.getUser(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -22,6 +25,7 @@ export default async function AdminTeamPage() {
 
       <AdminTeamClient
         managers={normalizeAdminTeam(data)}
+        currentUserId={userData.user?.id ?? null}
         loadError={error?.message ?? null}
       />
     </div>

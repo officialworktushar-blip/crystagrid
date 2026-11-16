@@ -11,6 +11,7 @@ import type { Screen } from "@/lib/types";
 type ProfileRelation = {
   full_name: string | null;
   company_name: string | null;
+  role: string | null;
 };
 
 type RawAdminScreen = Screen & {
@@ -21,7 +22,7 @@ export default async function AdminScreensPage() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("screens")
-    .select("*, profiles(full_name, company_name)")
+    .select("*, profiles(full_name, company_name, role)")
     .order("last_seen", { ascending: false, nullsFirst: false });
 
   const now = Date.now();
@@ -40,6 +41,7 @@ export default async function AdminScreensPage() {
       name: screen.name,
       owner_name: fullName ?? companyName ?? "Unknown customer",
       owner_company: fullName ? companyName : null,
+      owner_role: profile?.role ?? null,
       last_seen: screen.last_seen,
       last_seen_label: formatRelativeTime(screen.last_seen, now),
       created_at: screen.created_at,

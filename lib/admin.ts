@@ -20,6 +20,7 @@ export interface AdminTeamMember {
   full_name: string | null;
   email: string | null;
   phone: string | null;
+  role?: "admin" | "manager";
   customers_count: number;
 }
 
@@ -232,6 +233,7 @@ export function normalizeAdminTeam(data: unknown): AdminTeamMember[] {
       continue;
     }
 
+    const rawRole = pickString(row, ["role", "user_role"]);
     managers.push({
       id,
       full_name: pickString(row, [
@@ -242,6 +244,7 @@ export function normalizeAdminTeam(data: unknown): AdminTeamMember[] {
       ]),
       email: pickString(row, ["email", "user_email"]),
       phone: pickString(row, ["phone", "phone_number"]),
+      role: rawRole === "admin" ? "admin" : "manager",
       customers_count: pickNumber(row, [
         "customers_count",
         "customer_count",

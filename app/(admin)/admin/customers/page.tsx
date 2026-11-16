@@ -16,10 +16,12 @@ export default async function AdminCustomersPage({
     : (params.manager ?? null);
   const supabase = await createClient();
 
-  const [statsResult, teamResult] = await Promise.all([
+  const [statsResult, teamResult, userResult] = await Promise.all([
     supabase.rpc("admin_customer_stats"),
     supabase.rpc("admin_list_team"),
+    supabase.auth.getUser(),
   ]);
+  const currentAdminId = userResult.data.user?.id ?? null;
 
   return (
     <div className="space-y-8">
@@ -41,6 +43,7 @@ export default async function AdminCustomersPage({
         customers={normalizeAdminCustomerStats(statsResult.data)}
         managers={normalizeAdminTeam(teamResult.data)}
         initialManagerId={initialManagerId}
+        currentAdminId={currentAdminId}
         loadError={statsResult.error?.message ?? null}
         managersError={teamResult.error?.message ?? null}
       />

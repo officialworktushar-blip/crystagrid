@@ -16,6 +16,8 @@ import {
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
+type FilterKey = "all" | "assigned" | "unassigned";
+
 function ScreensCount({ online, total }: { online: number; total: number }) {
   return (
     <span className="tabular-nums">
@@ -28,23 +30,38 @@ function ScreensCount({ online, total }: { online: number; total: number }) {
 
 export default function ManageCustomersClient({
   customers,
-  showManager,
+  isAdmin,
+  currentUserId,
   loadError,
 }: {
   customers: AdminCustomerStats[];
-  showManager: boolean;
+  isAdmin: boolean;
+  currentUserId: string;
   loadError: string | null;
 }) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
+
+  const myAccount = useMemo(
+    () => customers.find((c) => c.customer_id === currentUserId) ?? null,
+    [customers, currentUserId],
+  );
+
+  const baseCustomers = useMemo(() => {
+    if (!isAdmin) return customers;
+    if (filter === "assigned") {
+      return customers.filter((c) => c.manager_id === currentUserId);
+    }
+    if (filter === "unassigned") {
+      return customers.filter((c) => !c.manager_id);
+    }
+    return customers;
+  }, [customers, filter, isAdmin, currentUserId]);
 
   const visibleCustomers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return customers;
-    }
-
-    return customers.filter((customer) =>
+    if (!normalizedQuery) return baseCustomers;
+    return baseCustomers.filter((customer) =>
       [
         customer.full_name,
         customer.company_name,
@@ -52,10 +69,53 @@ export default function ManageCustomersClient({
         customer.manager_name,
       ].some((value) => value?.toLowerCase().includes(normalizedQuery)),
     );
-  }, [customers, query]);
+  }, [baseCustomers, query]);
+
+  const allCount = customers.length;
+  const assignedCount = customers.filter((c) => c.manager_id === currentUserId).length;
+  const unassignedCount = customers.filter((c) => !c.manager_id).length;
 
   return (
     <div className="space-y-5">
+      {isAdmin ? (
+        <Link
+          href={`/manage/${currentUserId}`}
+          className="block rounded-2xl border border-sky-400/20 bg-sky-400/5 p-4 transition hover:border-sky-400/40 hover:bg-sky-400/10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">
+            My own screens
+          </p>
+          <p className="mt-1 text-sm text-white/80">
+            Open your account workspace ({myAccount ? customerDisplayName(myAccount) : "your account"})
+          </p>
+        </Link>
+      ) : null}
+
+      {isAdmin ? (
+        <div className="flex flex-wrap gap-2" aria-label="Customer filters">
+          {([
+            { key: "all", label: `All customers (${allCount})` },
+            { key: "assigned", label: `Assigned to me (${assignedCount})` },
+            { key: "unassigned", label: `Unassigned (${unassignedCount})` },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setFilter(t.key)}
+              aria-pressed={filter === t.key}
+              className={cn(
+                "rounded-full border px-4 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
+                filter === t.key
+                  ? "border-sky-400/40 bg-sky-400/15 text-sky-100"
+                  : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="relative w-full sm:max-w-sm">
         <Search
           aria-hidden="true"
@@ -83,12 +143,12 @@ export default function ManageCustomersClient({
       {visibleCustomers.length === 0 ? (
         <Card className="p-8 text-center hover:border-white/10 hover:shadow-none">
           <p className="text-sm font-medium text-white">
-            {customers.length === 0
+            {baseCustomers.length === 0
               ? "No customers assigned to you yet."
               : "No customers match your search."}
           </p>
           <p className="mt-1 text-sm text-body">
-            {customers.length === 0
+            {baseCustomers.length === 0
               ? "Assigned customer accounts will appear here."
               : "Try a different name, company, or email."}
           </p>
@@ -147,17 +207,15 @@ export default function ManageCustomersClient({
                   </div>
                 </div>
 
-                {showManager ? (
-                  <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3 text-xs text-muted">
-                    <UserRound
-                      aria-hidden="true"
-                      className="h-4 w-4 shrink-0 text-white/35"
-                    />
-                    <span className="truncate">
-                      Manager: {customer.manager_name || "Unassigned"}
-                    </span>
-                  </div>
-                ) : null}
+                <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3 text-xs text-muted">
+                  <UserRound
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 text-white/35"
+                  />
+                  <span className="truncate">
+                    Manager: {customer.manager_name || "Unassigned"}
+                  </span>
+                </div>
               </Link>
             </Card>
           ))}
@@ -170,7 +228,7 @@ export default function ManageCustomersClient({
           visibleCustomers.length === 0 && "sr-only",
         )}
       >
-        Showing {visibleCustomers.length} of {customers.length} customers.
+        Showing {visibleCustomers.length} of {baseCustomers.length} customers.
       </p>
     </div>
   );

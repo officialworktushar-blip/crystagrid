@@ -1,3 +1,4 @@
+import { isRole, type Role } from "@/lib/roles";
 import type { ScreenStatus } from "@/lib/types";
 
 export interface AdminCustomerStats {
@@ -20,7 +21,7 @@ export interface AdminTeamMember {
   full_name: string | null;
   email: string | null;
   phone: string | null;
-  role?: "admin" | "manager";
+  role: Role;
   customers_count: number;
 }
 
@@ -244,7 +245,7 @@ export function normalizeAdminTeam(data: unknown): AdminTeamMember[] {
       ]),
       email: pickString(row, ["email", "user_email"]),
       phone: pickString(row, ["phone", "phone_number"]),
-      role: rawRole === "admin" ? "admin" : "manager",
+      role: isRole(rawRole) ? rawRole : "customer",
       customers_count: pickNumber(row, [
         "customers_count",
         "customer_count",

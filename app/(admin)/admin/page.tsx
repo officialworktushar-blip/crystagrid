@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 
 type RecentScreenRow = {
   id: string;
-  customer_id: string;
+  customer_id: string | null;
   name: string;
   last_seen: string | null;
 };
@@ -307,7 +307,9 @@ export default async function AdminOverviewPage() {
           ) : (
             <ul className="divide-y divide-white/5">
               {recentScreens.map((screen) => {
-                const customer = customerById.get(screen.customer_id);
+                const customer = screen.customer_id
+                  ? customerById.get(screen.customer_id)
+                  : undefined;
                 const online = isOnline(screen.last_seen, now);
 
                 return (

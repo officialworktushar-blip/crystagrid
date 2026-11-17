@@ -19,7 +19,7 @@ export default async function AdminTeamPage() {
           Team
         </h1>
         <p className="mt-2 text-sm text-body">
-          Manage account managers and the customers they look after.
+          Manage team roles and the customers your managers look after.
         </p>
       </div>
 

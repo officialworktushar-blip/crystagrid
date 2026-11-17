@@ -1211,7 +1211,9 @@ export default function ScreensClient({
           screen={displayScreen}
           siblingsCount={
             screens.filter(
-              (item) => item.customer_id === displayScreen.customer_id,
+              (item) =>
+                item.customer_id !== null &&
+                item.customer_id === displayScreen.customer_id,
             ).length
           }
           onClose={closeDisplayModal}

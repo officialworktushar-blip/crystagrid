@@ -338,7 +338,7 @@ export default function DisplaySettingsDialog({
         .update(displayToColumns(clamped));
 
       const filtered =
-        applyAll && siblingsCount > 1
+        applyAll && siblingsCount > 1 && screen.customer_id
           ? update.eq("customer_id", screen.customer_id)
           : update.eq("id", screen.id);
 

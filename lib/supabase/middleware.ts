@@ -58,9 +58,22 @@ export async function updateSession(request: NextRequest) {
     pathname === "/admin" || pathname.startsWith("/admin/");
   const isManageRoute =
     pathname === "/manage" || pathname.startsWith("/manage/");
+  const isDeviceRoute =
+    pathname === "/device" || pathname.startsWith("/device/");
+  const isCmRoute = pathname === "/cm" || pathname.startsWith("/cm/");
+  const isSalesRoute =
+    pathname === "/sales" || pathname.startsWith("/sales/");
   const isAuthRoute = AUTH_ROUTES.has(pathname);
 
-  if (!user && (isDashboardRoute || isAdminRoute || isManageRoute)) {
+  if (
+    !user &&
+    (isDashboardRoute ||
+      isAdminRoute ||
+      isManageRoute ||
+      isDeviceRoute ||
+      isCmRoute ||
+      isSalesRoute)
+  ) {
     return redirectTo(request, supabaseResponse, "/login");
   }
 

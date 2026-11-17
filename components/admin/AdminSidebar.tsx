@@ -15,6 +15,7 @@ import {
   Monitor,
   Package,
   Tag,
+  TrendingUp,
   Users,
   UsersRound,
   X,
@@ -60,6 +61,14 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
+    ],
+  },
+  {
+    label: "Other panels",
+    items: [
+      { label: "Device Manager panel", href: "/device", icon: Monitor },
+      { label: "Customer Manager panel", href: "/cm", icon: UsersRound },
+      { label: "Sales Manager panel", href: "/sales", icon: TrendingUp },
     ],
   },
 ];

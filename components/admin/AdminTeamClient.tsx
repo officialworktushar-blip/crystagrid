@@ -6,10 +6,8 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, Phone, UsersRound } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import {
-  managerDisplayName,
-  type AdminTeamMember,
-} from "@/lib/admin";
+import { managerDisplayName, type AdminTeamMember } from "@/lib/admin";
+import { isRole, ROLE_LABELS, type Role } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +15,44 @@ type Notice = {
   type: "success" | "error";
   message: string;
 };
+
+type StaffRole = Exclude<Role, "admin" | "customer">;
+
+const STAFF_ROLES: { value: StaffRole; label: string }[] = [
+  { value: "manager", label: ROLE_LABELS.manager },
+  { value: "device_manager", label: ROLE_LABELS.device_manager },
+  { value: "sales_manager", label: ROLE_LABELS.sales_manager },
+];
+
+const CUSTOMER_OPTION = {
+  value: "customer",
+  label: "Customer (remove staff role)",
+} as const;
+
+const ROLE_OPTIONS: { value: Role; label: string }[] = [
+  ...STAFF_ROLES,
+  CUSTOMER_OPTION,
+];
+
+const selectClass =
+  "h-11 w-full cursor-pointer rounded-2xl border border-white/10 bg-surface-2 px-4 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 [&>option]:bg-surface-2";
+
+function RoleChip({ role }: { role: Role }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+        role === "admin"
+          ? "border-sky-400/30 bg-sky-400/10 text-sky-200"
+          : role === "manager"
+            ? "border-blue-400/30 bg-blue-400/10 text-blue-200"
+            : "border-white/10 bg-white/5 text-white/70",
+      )}
+    >
+      {ROLE_LABELS[role]}
+    </span>
+  );
+}
 
 export default function AdminTeamClient({
   managers,
@@ -29,8 +65,9 @@ export default function AdminTeamClient({
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<StaffRole>("manager");
   const [adding, setAdding] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   async function handleAdd(event: FormEvent<HTMLFormElement>) {
@@ -49,7 +86,7 @@ export default function AdminTeamClient({
     const supabase = createClient();
     const { error } = await supabase.rpc("admin_set_role", {
       p_email: nextEmail,
-      p_role: "manager",
+      p_role: role,
     });
 
     setAdding(false);
@@ -62,40 +99,44 @@ export default function AdminTeamClient({
     setEmail("");
     setNotice({
       type: "success",
-      message: "Account manager role granted.",
+      message: `${ROLE_LABELS[role]} role granted.`,
     });
     router.refresh();
   }
 
-  async function handleRemove(manager: AdminTeamMember) {
-    if (!manager.email) {
-      setNotice({
-        type: "error",
-        message: "This manager does not have an email address.",
-      });
+  async function handleRoleChange(member: AdminTeamMember, nextRole: Role) {
+    if (nextRole === member.role) {
       return;
     }
 
+    const label =
+      nextRole === "customer" ? CUSTOMER_OPTION.label : ROLE_LABELS[nextRole];
     const confirmed = window.confirm(
-      `Remove the manager role from "${managerDisplayName(
-        manager,
-      )}"? This will change them to a customer account.`,
+      `Change the role of "${managerDisplayName(member)}" to ${label}?`,
     );
 
     if (!confirmed) {
       return;
     }
 
-    setRemovingId(manager.id);
+    if (!member.email) {
+      setNotice({
+        type: "error",
+        message: "This team member does not have an email address.",
+      });
+      return;
+    }
+
+    setUpdatingId(member.id);
     setNotice(null);
 
     const supabase = createClient();
     const { error } = await supabase.rpc("admin_set_role", {
-      p_email: manager.email,
-      p_role: "customer",
+      p_email: member.email,
+      p_role: nextRole,
     });
 
-    setRemovingId(null);
+    setUpdatingId(null);
 
     if (error) {
       setNotice({ type: "error", message: error.message });
@@ -104,7 +145,7 @@ export default function AdminTeamClient({
 
     setNotice({
       type: "success",
-      message: `Removed the manager role from ${managerDisplayName(manager)}.`,
+      message: `${managerDisplayName(member)} is now ${ROLE_LABELS[nextRole]}.`,
     });
     router.refresh();
   }
@@ -132,10 +173,10 @@ export default function AdminTeamClient({
           </span>
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-white">
-              Add account manager
+              Add team member
             </h2>
             <p className="mt-1 text-sm text-body">
-              Grant manager access to a registered account.
+              Grant a role to a registered account.
             </p>
           </div>
         </div>
@@ -145,26 +186,44 @@ export default function AdminTeamClient({
           className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start"
         >
           <div className="min-w-0 flex-1">
-            <label htmlFor="manager-email" className="sr-only">
+            <label htmlFor="team-email" className="sr-only">
               Email address
             </label>
             <input
-              id="manager-email"
+              id="team-email"
               type="email"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="manager@example.com"
+              placeholder="teammate@example.com"
               autoComplete="email"
               className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40"
             />
           </div>
-          <Button
-            type="submit"
-            disabled={adding}
-            className="shrink-0 sm:h-11"
-          >
-            {adding ? "Updating..." : "Make account manager"}
+          <div className="min-w-0 sm:w-56">
+            <label htmlFor="team-role" className="sr-only">
+              Role
+            </label>
+            <select
+              id="team-role"
+              value={role}
+              onChange={(event) => {
+                const nextRole = event.target.value;
+                if (isRole(nextRole) && nextRole !== "admin" && nextRole !== "customer") {
+                  setRole(nextRole);
+                }
+              }}
+              className={selectClass}
+            >
+              {STAFF_ROLES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button type="submit" disabled={adding} className="shrink-0 sm:h-11">
+            {adding ? "Adding..." : "Add team member"}
           </Button>
         </form>
 
@@ -176,11 +235,11 @@ export default function AdminTeamClient({
       <section className="space-y-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-white">
-            Account managers
+            Team members
           </h2>
           <p className="mt-1 text-sm text-body">
             {managers.length}{" "}
-            {managers.length === 1 ? "account manager" : "account managers"}.
+            {managers.length === 1 ? "team member" : "team members"}.
           </p>
         </div>
 
@@ -189,7 +248,7 @@ export default function AdminTeamClient({
             role="alert"
             className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200"
           >
-            Account managers could not be loaded. {loadError}
+            Team members could not be loaded. {loadError}
           </p>
         ) : null}
 
@@ -197,21 +256,21 @@ export default function AdminTeamClient({
           loadError ? null : (
             <Card className="p-8 text-center hover:border-white/10 hover:shadow-none">
               <p className="text-sm font-medium text-white">
-                No account managers yet.
+                No team members yet.
               </p>
               <p className="mt-1 text-sm text-body">
-                Use the form above to make a registered account a manager.
+                Use the form above to add a registered account.
               </p>
             </Card>
           )
         ) : (
           <Card className="overflow-hidden p-0 hover:border-white/10 hover:shadow-none">
             <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[52rem] text-left text-sm">
+              <table className="w-full min-w-[56rem] text-left text-sm">
                 <thead className="border-b border-white/5 bg-white/[0.02] text-xs uppercase tracking-[0.12em] text-muted">
                   <tr>
                     <th scope="col" className="px-5 py-3 font-semibold">
-                      Manager
+                      Member
                     </th>
                     <th scope="col" className="px-4 py-3 font-semibold">
                       Phone
@@ -228,144 +287,179 @@ export default function AdminTeamClient({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {managers.map((manager) => (
-                    <tr
-                      key={manager.id}
-                      className="transition duration-200 hover:bg-white/[0.03]"
-                    >
-                      <td className="max-w-[20rem] px-5 py-3.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-semibold text-white">
-                            {managerDisplayName(manager)}
-                          </p>
-                          {manager.role === "admin" ? (
-                            <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold text-sky-200">
-                              Admin
-                            </span>
-                          ) : (
-                            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/70">
-                              Account manager
-                            </span>
-                          )}
-                          {currentUserId === manager.id ? (
-                            <span className="text-[10px] text-muted">You</span>
-                          ) : null}
-                        </div>
-                        {manager.email ? (
-                          <a
-                            href={`mailto:${manager.email}`}
-                            className="mt-0.5 block truncate text-xs text-brand-sky transition duration-200 hover:text-white"
-                          >
-                            {manager.email}
-                          </a>
-                        ) : (
-                          <p className="mt-0.5 text-xs text-muted">No email</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70">
-                        {manager.phone || "—"}
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70 tabular-nums">
-                        {manager.customers_count}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link
-                            href={`/admin/customers?manager=${manager.id}`}
-                            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                          >
-                            View customers
-                            <ArrowRight
-                              aria-hidden="true"
-                              className="h-3.5 w-3.5"
-                            />
-                          </Link>
-                          {manager.role !== "admin" ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void handleRemove(manager)}
-                              disabled={removingId === manager.id}
-                              className="h-8 px-3 text-xs text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                  {managers.map((member) => {
+                    const canChangeRole =
+                      member.role !== "admin" && member.id !== currentUserId;
+
+                    return (
+                      <tr
+                        key={member.id}
+                        className="transition duration-200 hover:bg-white/[0.03]"
+                      >
+                        <td className="max-w-[20rem] px-5 py-3.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-semibold text-white">
+                              {managerDisplayName(member)}
+                            </p>
+                            <RoleChip role={member.role} />
+                            {currentUserId === member.id ? (
+                              <span className="text-[10px] text-muted">You</span>
+                            ) : null}
+                          </div>
+                          {member.email ? (
+                            <a
+                              href={`mailto:${member.email}`}
+                              className="mt-0.5 block truncate text-xs text-brand-sky transition duration-200 hover:text-white"
                             >
-                              {removingId === manager.id
-                                ? "Removing..."
-                                : "Remove manager role"}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                              {member.email}
+                            </a>
+                          ) : (
+                            <p className="mt-0.5 text-xs text-muted">No email</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70">
+                          {member.phone || "—"}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70 tabular-nums">
+                          {member.role === "manager"
+                            ? member.customers_count
+                            : "—"}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {member.role === "manager" ? (
+                              <Link
+                                href={`/admin/customers?manager=${member.id}`}
+                                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                              >
+                                View customers
+                                <ArrowRight
+                                  aria-hidden="true"
+                                  className="h-3.5 w-3.5"
+                                />
+                              </Link>
+                            ) : null}
+                            {canChangeRole ? (
+                              <select
+                                aria-label={`Change role for ${managerDisplayName(member)}`}
+                                value={member.role}
+                                disabled={updatingId === member.id}
+                                onChange={(event) => {
+                                  const nextRole = event.target.value;
+                                  if (isRole(nextRole)) {
+                                    void handleRoleChange(member, nextRole);
+                                  }
+                                }}
+                                className={cn(
+                                  selectClass,
+                                  "h-9 max-w-[15rem] px-3 text-xs disabled:opacity-50",
+                                )}
+                              >
+                                {ROLE_OPTIONS.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             <div className="divide-y divide-white/5 lg:hidden">
-              {managers.map((manager) => (
-                <div key={manager.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-white">
-                          {managerDisplayName(manager)}
-                        </p>
-                        {manager.role === "admin" ? (
-                          <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold text-sky-200">
-                            Admin
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold text-white/70">
-                            Account manager
-                          </span>
-                        )}
-                        {currentUserId === manager.id ? (
-                          <span className="text-[10px] text-muted">You</span>
+              {managers.map((member) => {
+                const canChangeRole =
+                  member.role !== "admin" && member.id !== currentUserId;
+
+                return (
+                  <div key={member.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {managerDisplayName(member)}
+                          </p>
+                          <RoleChip role={member.role} />
+                          {currentUserId === member.id ? (
+                            <span className="text-[10px] text-muted">You</span>
+                          ) : null}
+                        </div>
+                        {member.email ? (
+                          <a
+                            href={`mailto:${member.email}`}
+                            className="mt-0.5 block truncate text-xs text-brand-sky transition duration-200 hover:text-white"
+                          >
+                            {member.email}
+                          </a>
+                        ) : null}
+                        {member.phone ? (
+                          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+                            <Phone aria-hidden="true" className="h-3.5 w-3.5" />
+                            {member.phone}
+                          </p>
                         ) : null}
                       </div>
-                      {manager.email ? (
-                        <a
-                          href={`mailto:${manager.email}`}
-                          className="mt-0.5 block truncate text-xs text-brand-sky transition duration-200 hover:text-white"
-                        >
-                          {manager.email}
-                        </a>
-                      ) : null}
-                      {manager.phone ? (
-                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
-                          <Phone aria-hidden="true" className="h-3.5 w-3.5" />
-                          {manager.phone}
-                        </p>
+                      {member.role === "manager" ? (
+                        <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/60 tabular-nums">
+                          {member.customers_count}{" "}
+                          {member.customers_count === 1
+                            ? "customer"
+                            : "customers"}
+                        </span>
                       ) : null}
                     </div>
-                    <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/60 tabular-nums">
-                      {manager.customers_count}{" "}
-                      {manager.customers_count === 1 ? "customer" : "customers"}
-                    </span>
-                  </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                    <Link
-                      href={`/admin/customers?manager=${manager.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                    >
-                      View customers
-                      <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-                    </Link>
-                    {manager.role !== "admin" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void handleRemove(manager)}
-                        disabled={removingId === manager.id}
-                        className="h-8 px-3 text-xs text-red-300 hover:bg-red-400/10 hover:text-red-200"
-                      >
-                        {removingId === manager.id ? "Removing..." : "Remove manager role"}
-                      </Button>
+                    {canChangeRole ? (
+                      <div className="mt-3">
+                        <label
+                          htmlFor={`role-${member.id}`}
+                          className="mb-1.5 block text-xs text-muted"
+                        >
+                          Role
+                        </label>
+                        <select
+                          id={`role-${member.id}`}
+                          value={member.role}
+                          disabled={updatingId === member.id}
+                          onChange={(event) => {
+                            const nextRole = event.target.value;
+                            if (isRole(nextRole)) {
+                              void handleRoleChange(member, nextRole);
+                            }
+                          }}
+                          className={cn(selectClass, "text-xs disabled:opacity-50")}
+                        >
+                          {ROLE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+
+                    {member.role === "manager" ? (
+                      <div className="mt-3">
+                        <Link
+                          href={`/admin/customers?manager=${member.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                        >
+                          View customers
+                          <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
                     ) : null}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         )}

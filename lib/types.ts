@@ -1,4 +1,6 @@
-export type UserRole = "admin" | "manager" | "customer";
+import type { Role } from "@/lib/roles";
+
+export type UserRole = Role;
 
 export type ScreenStatus = "online" | "offline" | "pending";
 
@@ -38,11 +40,17 @@ export interface Profile {
 
 export interface Screen {
   id: string;
-  customer_id: string;
+  customer_id: string | null;
   name: string;
   status: ScreenStatus;
   location: string | null;
   last_seen: string | null;
+  property_id: string | null;
+  block: string | null;
+  spot: string | null;
+  shop_name: string | null;
+  notes: string | null;
+  added_by: string | null;
   created_at: string;
   updated_at?: string | null;
   display_fit?: DisplayFit | null;

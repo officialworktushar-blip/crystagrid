@@ -1,38 +1,13 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import type { Profile } from "@/lib/types";
-import { createClient } from "@/lib/supabase/server";
+import { requireRole } from "@/lib/auth";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("id, full_name, role, company_name, phone")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const profile = (profileData ?? null) as Profile | null;
-
-  if (profile?.role === "admin") {
-    redirect("/admin");
-  }
-
-  if (profile?.role === "manager") {
-    redirect("/manage");
-  }
+  const { user, profile } = await requireRole(["customer"]);
 
   const metadataName =
     typeof user.user_metadata?.full_name === "string"

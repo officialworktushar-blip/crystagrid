@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import Button from "@/components/ui/Button";
+import { homeForRole, isRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
 
 const inputClass =
@@ -67,14 +68,11 @@ function LoginForm() {
           .eq("id", signInData.user.id)
           .maybeSingle();
         const profile = profileData as { role?: string } | null;
+        const rawRole: unknown = profile?.role;
+        const role = isRole(rawRole) ? rawRole : "customer";
 
-        if (profile?.role === "admin") {
-          destination = "/admin";
-        } else if (profile?.role === "manager") {
-          destination = "/manage";
-        } else if (profile?.role === "customer" && safeNext) {
-          destination = safeNext;
-        }
+        destination =
+          role === "customer" && safeNext ? safeNext : homeForRole(role);
       }
 
       router.push(destination);

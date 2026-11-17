@@ -1,13 +1,17 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
 import {
+  ChevronDown,
+  ChevronRight,
   Loader2,
   Package,
   Pencil,
@@ -18,25 +22,48 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FilterBar from "@/components/ui/FilterBar";
 import type {
   AdCity,
   AdPackage,
   AdPackageProperty,
+  AdPackageStats,
   AdPlace,
   AdProperty,
+  AdPropertyScreen,
   AdPropertyType,
   AdRateUnit,
 } from "@/lib/ads";
-import { formatINR, ratePerWeek } from "@/lib/ads";
+import {
+  formatINR,
+  normalizeAdPropertyScreens,
+  ratePerWeek,
+} from "@/lib/ads";
+import { formatRelativeTime } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useFilters } from "@/lib/useFilters";
 
 type Notice = {
   type: "success" | "error";
   message: string;
 };
 
-type ActiveFilter = "all" | "active" | "inactive";
+type PackageFilters = {
+  search: string;
+  city: string;
+  type: string;
+  status: string;
+  containsProperty: string;
+  withoutScreens: boolean;
+};
+
+type PropertyScreensState = {
+  rows: AdPropertyScreen[];
+  loading: boolean;
+  error: string | null;
+  loaded: boolean;
+};
 
 type PackageForm = {
   id: string | null;
@@ -55,6 +82,15 @@ const inputClass =
 
 const reachFormatter = new Intl.NumberFormat("en-IN");
 
+const initialFilters: PackageFilters = {
+  search: "",
+  city: "",
+  type: "",
+  status: "",
+  containsProperty: "",
+  withoutScreens: false,
+};
+
 function compareRows(
   a: { sort: number; name: string },
   b: { sort: number; name: string },
@@ -64,6 +100,56 @@ function compareRows(
 
 function nextSort(rows: { sort: number }[]) {
   return rows.reduce((max, row) => Math.max(max, row.sort), 0) + 1;
+}
+
+function packageCounts(
+  item: AdPackage,
+  statsByPackage: Map<string, AdPackageStats>,
+  linksByPackage: Map<string, string[]>,
+  propertyById: Map<string, AdProperty>,
+) {
+  const stat = statsByPackage.get(item.id);
+
+  if (stat) {
+    return {
+      propertiesCount: stat.properties_count,
+      screensCount: stat.screens_count,
+      onlineCount: stat.online_count,
+    };
+  }
+
+  const propertyIds = linksByPackage.get(item.id) ?? [];
+  const screensCount = propertyIds.reduce(
+    (total, propertyId) =>
+      total + (propertyById.get(propertyId)?.screens_count ?? 0),
+    0,
+  );
+
+  return {
+    propertiesCount: propertyIds.length,
+    screensCount,
+    onlineCount: 0,
+  };
+}
+
+function screensLabel(counts: {
+  screensCount: number;
+  onlineCount: number;
+}) {
+  return `${counts.screensCount} screens (${counts.onlineCount} online)`;
+}
+
+function screenLocation(screen: AdPropertyScreen) {
+  const parts = [
+    screen.block,
+    screen.spot,
+    screen.shop_name ? `Shop: ${screen.shop_name}` : null,
+  ].filter(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+  );
+
+  return parts.length > 0 ? parts.join(" · ") : "Not set";
 }
 
 function parseNonNegativeInteger(value: string): number | null {
@@ -127,6 +213,118 @@ function ActiveToggle({
   );
 }
 
+function PropertyScreensContent({
+  state,
+}: {
+  state?: PropertyScreensState;
+}) {
+  if (!state || (state.loading && !state.loaded)) {
+    return <p className="text-xs text-muted">Loading screens...</p>;
+  }
+
+  if (state.error) {
+    return (
+      <p role="alert" className="text-xs text-red-300">
+        Screens could not be loaded. {state.error}
+      </p>
+    );
+  }
+
+  if (state.rows.length === 0) {
+    return <p className="text-xs text-muted">No screens found.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        Screens
+      </p>
+      <ul className="space-y-2">
+        {state.rows.map((screen) => (
+          <li
+            key={screen.screen_id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-xs"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-white">
+                {screen.screen_name || screen.screen_id}
+              </p>
+              <p className="mt-0.5 text-muted">{screenLocation(screen)}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                  screen.online
+                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+                    : "border-white/10 bg-white/5 text-white/50",
+                )}
+              >
+                {screen.online ? "Online" : "Offline"}
+              </span>
+              <span className="text-muted">
+                Last seen: {formatRelativeTime(screen.last_seen)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PackagePropertiesDetail({
+  packageId,
+  linksByPackage,
+  propertyById,
+  screensByProperty,
+}: {
+  packageId: string;
+  linksByPackage: Map<string, string[]>;
+  propertyById: Map<string, AdProperty>;
+  screensByProperty: Record<string, PropertyScreensState>;
+}) {
+  const propertyIds = linksByPackage.get(packageId) ?? [];
+
+  if (propertyIds.length === 0) {
+    return <p className="text-sm text-body">No included properties.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        Included properties
+      </p>
+      <ul className="space-y-3">
+        {propertyIds.map((propertyId) => {
+          const property = propertyById.get(propertyId);
+
+          return (
+            <li
+              key={propertyId}
+              className="rounded-xl border border-white/5 bg-white/[0.02] p-3"
+            >
+              <p className="text-sm font-medium text-white">
+                {property?.name ?? propertyId}
+              </p>
+              {!property ? (
+                <p className="mt-0.5 text-xs text-muted">
+                  Property details are unavailable.
+                </p>
+              ) : null}
+              <div className="mt-2">
+                <PropertyScreensContent
+                  state={screensByProperty[propertyId]}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export default function AdminAdPackagesClient({
   cities,
   places,
@@ -134,6 +332,7 @@ export default function AdminAdPackagesClient({
   properties,
   packages: initialPackages,
   packageProperties: initialPackageProperties,
+  packageStats,
   loadError,
 }: {
   cities: AdCity[];
@@ -142,17 +341,22 @@ export default function AdminAdPackagesClient({
   properties: AdProperty[];
   packages: AdPackage[];
   packageProperties: AdPackageProperty[];
+  packageStats: AdPackageStats[];
   loadError: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const { filters, set, clear } = useFilters(initialFilters);
   const [packages, setPackages] = useState<AdPackage[]>(initialPackages);
   const [packageProperties, setPackageProperties] = useState<
     AdPackageProperty[]
   >(initialPackageProperties);
-  const [query, setQuery] = useState("");
-  const [cityFilter, setCityFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
+  const [expandedPackages, setExpandedPackages] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [screensByProperty, setScreensByProperty] = useState<
+    Record<string, PropertyScreensState>
+  >({});
+  const screensRequestRef = useRef<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<PackageForm>(() =>
     createEmptyForm(cities),
@@ -179,6 +383,10 @@ export default function AdminAdPackagesClient({
     () => [...propertyTypes].sort(compareRows),
     [propertyTypes],
   );
+  const sortedProperties = useMemo(
+    () => [...properties].sort(compareRows),
+    [properties],
+  );
   const cityById = useMemo(
     () =>
       new Map(sortedCities.map((city) => [city.id, city] as const)),
@@ -193,6 +401,24 @@ export default function AdminAdPackagesClient({
     () =>
       new Map(sortedTypes.map((type) => [type.id, type] as const)),
     [sortedTypes],
+  );
+  const propertyById = useMemo(
+    () =>
+      new Map(
+        sortedProperties.map(
+          (property) => [property.id, property] as const,
+        ),
+      ),
+    [sortedProperties],
+  );
+  const statsByPackage = useMemo(
+    () =>
+      new Map(
+        packageStats.map(
+          (stat) => [stat.package_id, stat] as const,
+        ),
+      ),
+    [packageStats],
   );
 
   const linksByPackage = useMemo(() => {
@@ -212,23 +438,43 @@ export default function AdminAdPackagesClient({
   }, [packageProperties]);
 
   const visiblePackages = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = filters.search.trim().toLowerCase();
 
     return packages
       .filter((item) => {
-        if (cityFilter !== "all" && item.city_id !== cityFilter) {
+        const counts = packageCounts(
+          item,
+          statsByPackage,
+          linksByPackage,
+          propertyById,
+        );
+
+        if (filters.city && item.city_id !== filters.city) {
           return false;
         }
 
-        if (typeFilter !== "all" && item.type_id !== typeFilter) {
+        if (filters.type && item.type_id !== filters.type) {
           return false;
         }
 
-        if (activeFilter === "active" && !item.is_active) {
+        if (filters.status === "active" && !item.is_active) {
           return false;
         }
 
-        if (activeFilter === "inactive" && item.is_active) {
+        if (filters.status === "inactive" && item.is_active) {
+          return false;
+        }
+
+        if (
+          filters.containsProperty &&
+          !(linksByPackage.get(item.id) ?? []).includes(
+            filters.containsProperty,
+          )
+        ) {
+          return false;
+        }
+
+        if (filters.withoutScreens && counts.screensCount > 0) {
           return false;
         }
 
@@ -236,12 +482,7 @@ export default function AdminAdPackagesClient({
           return true;
         }
 
-        const values = [
-          item.name,
-          item.description,
-          cityById.get(item.city_id)?.name,
-          item.type_id ? typeById.get(item.type_id)?.name : null,
-        ];
+        const values = [item.name, item.description];
 
         return values.some((value) =>
           value?.toLowerCase().includes(normalizedQuery),
@@ -249,13 +490,11 @@ export default function AdminAdPackagesClient({
       })
       .sort(compareRows);
   }, [
-    activeFilter,
-    cityById,
-    cityFilter,
+    filters,
+    linksByPackage,
     packages,
-    query,
-    typeById,
-    typeFilter,
+    propertyById,
+    statsByPackage,
   ]);
 
   const formProperties = useMemo(
@@ -380,6 +619,79 @@ export default function AdminAdPackagesClient({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeModal, isModalOpen, saving]);
+
+  async function loadPropertyScreens(propertyId: string) {
+    if (screensRequestRef.current.has(propertyId)) {
+      return;
+    }
+
+    screensRequestRef.current.add(propertyId);
+    setScreensByProperty((current) => ({
+      ...current,
+      [propertyId]: {
+        rows: [],
+        loading: true,
+        error: null,
+        loaded: false,
+      },
+    }));
+
+    try {
+      const { data, error } = await supabase.rpc("property_screens", {
+        p_property: propertyId,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setScreensByProperty((current) => ({
+        ...current,
+        [propertyId]: {
+          rows: normalizeAdPropertyScreens(data),
+          loading: false,
+          error: null,
+          loaded: true,
+        },
+      }));
+    } catch (error) {
+      screensRequestRef.current.delete(propertyId);
+      setScreensByProperty((current) => ({
+        ...current,
+        [propertyId]: {
+          rows: [],
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Screens could not be loaded.",
+          loaded: true,
+        },
+      }));
+    }
+  }
+
+  function togglePackageExpanded(packageId: string) {
+    const willExpand = !expandedPackages.has(packageId);
+
+    setExpandedPackages((current) => {
+      const next = new Set(current);
+
+      if (next.has(packageId)) {
+        next.delete(packageId);
+      } else {
+        next.add(packageId);
+      }
+
+      return next;
+    });
+
+    if (willExpand) {
+      for (const propertyId of linksByPackage.get(packageId) ?? []) {
+        void loadPropertyScreens(propertyId);
+      }
+    }
+  }
 
   function openAddModal() {
     if (sortedCities.length === 0) {
@@ -736,112 +1048,75 @@ export default function AdminAdPackagesClient({
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-white">
-            Ad packages
-          </h2>
-          <p className="mt-1 text-sm text-body">
-            Showing {visiblePackages.length} of {packages.length}{" "}
-            {packages.length === 1 ? "package" : "packages"}.
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold tracking-tight text-white">
+          Ad packages
+        </h2>
         <Button onClick={openAddModal} disabled={busy}>
           <Plus aria-hidden="true" className="h-4 w-4" />
           Add Package
         </Button>
       </div>
 
-      <Card className="p-4 hover:border-white/10 hover:shadow-none sm:p-5">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
-          <div>
-            <label
-              htmlFor="package-search"
-              className="mb-1 block text-xs text-muted"
-            >
-              Search
-            </label>
-            <div className="relative">
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              />
-              <input
-                id="package-search"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Name, description, city, or type"
-                className={cn(inputClass, "pl-10")}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="package-city-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              City
-            </label>
-            <select
-              id="package-city-filter"
-              value={cityFilter}
-              onChange={(event) => setCityFilter(event.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All cities</option>
-              {sortedCities.map((city) => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="package-type-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              Type
-            </label>
-            <select
-              id="package-type-filter"
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All types</option>
-              {sortedTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="package-active-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              Status
-            </label>
-            <select
-              id="package-active-filter"
-              value={activeFilter}
-              onChange={(event) =>
-                setActiveFilter(event.target.value as ActiveFilter)
-              }
-              className={inputClass}
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-      </Card>
+      <FilterBar
+        search={{
+          value: filters.search,
+          onChange: (value) => set("search", value),
+          placeholder: "Search name or description",
+        }}
+        selects={[
+          {
+            key: "city",
+            label: "City",
+            value: filters.city,
+            onChange: (value) => set("city", value),
+            options: sortedCities.map((city) => ({
+              value: city.id,
+              label: city.name,
+            })),
+          },
+          {
+            key: "type",
+            label: "Type",
+            value: filters.type,
+            onChange: (value) => set("type", value),
+            options: sortedTypes.map((type) => ({
+              value: type.id,
+              label: type.name,
+            })),
+          },
+          {
+            key: "status",
+            label: "Status",
+            value: filters.status,
+            onChange: (value) => set("status", value),
+            options: [
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ],
+          },
+          {
+            key: "containsProperty",
+            label: "Contains property",
+            value: filters.containsProperty,
+            onChange: (value) => set("containsProperty", value),
+            options: sortedProperties.map((property) => ({
+              value: property.id,
+              label: property.name,
+            })),
+          },
+        ]}
+        toggles={[
+          {
+            key: "withoutScreens",
+            label: "Without screens only",
+            checked: filters.withoutScreens,
+            onChange: (value) => set("withoutScreens", value),
+          },
+        ]}
+        resultCount={visiblePackages.length}
+        total={packages.length}
+        onClear={clear}
+      />
 
       {visiblePackages.length === 0 ? (
         <Card className="flex flex-col items-center justify-center px-6 py-14 text-center hover:border-white/10 hover:shadow-none">
@@ -872,7 +1147,7 @@ export default function AdminAdPackagesClient({
       ) : (
         <Card className="overflow-hidden p-0 hover:border-white/10 hover:shadow-none">
           <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[70rem] text-left text-sm">
+            <table className="w-full min-w-[78rem] text-left text-sm">
               <thead className="border-b border-white/5 bg-white/[0.02] text-xs uppercase tracking-[0.12em] text-muted">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
@@ -894,6 +1169,9 @@ export default function AdminAdPackagesClient({
                     Properties
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
+                    Screens
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     Active
                   </th>
                   <th
@@ -910,83 +1188,130 @@ export default function AdminAdPackagesClient({
                   const type = item.type_id
                     ? typeById.get(item.type_id)
                     : null;
-                  const propertyCount =
-                    linksByPackage.get(item.id)?.length ?? 0;
+                  const counts = packageCounts(
+                    item,
+                    statsByPackage,
+                    linksByPackage,
+                    propertyById,
+                  );
+                  const expanded = expandedPackages.has(item.id);
                   const deleting =
                     pending === `package-delete:${item.id}`;
 
                   return (
-                    <tr
-                      key={item.id}
-                      className="transition duration-200 hover:bg-white/[0.03]"
-                    >
-                      <td className="max-w-[22rem] px-5 py-3.5">
-                        <p className="truncate font-semibold text-white">
-                          {item.name}
-                        </p>
-                        <p className="mt-0.5 line-clamp-2 text-xs text-muted">
-                          {item.description || "No description"}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70">
-                        {city?.name || "Unknown city"}
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70">
-                        {type?.name || "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-white/80">
-                        {formatINR(item.rate)}{" "}
-                        <span className="text-xs text-muted">
-                          / {item.rate_unit}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70 tabular-nums">
-                        {reachFormatter.format(item.monthly_reach)}
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70 tabular-nums">
-                        {propertyCount}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <ActiveToggle
-                          active={item.is_active}
-                          label={`${
-                            item.is_active ? "Deactivate" : "Activate"
-                          } ${item.name}`}
-                          disabled={busy}
-                          onChange={() => void handleToggle(item)}
-                        />
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(item)}
+                    <Fragment key={item.id}>
+                      <tr className="transition duration-200 hover:bg-white/[0.03]">
+                        <td className="max-w-[22rem] px-5 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                togglePackageExpanded(item.id)
+                              }
+                              aria-expanded={expanded}
+                              aria-controls={`package-properties-${item.id}`}
+                              className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                            >
+                              {expanded ? (
+                                <ChevronDown
+                                  aria-hidden="true"
+                                  className="h-4 w-4 shrink-0 text-white/50"
+                                />
+                              ) : (
+                                <ChevronRight
+                                  aria-hidden="true"
+                                  className="h-4 w-4 shrink-0 text-white/50"
+                                />
+                              )}
+                              <span className="truncate font-semibold text-white">
+                                {item.name}
+                              </span>
+                            </button>
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted">
+                            {item.description || "No description"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70">
+                          {city?.name || "Unknown city"}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70">
+                          {type?.name || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5 font-medium text-white/80">
+                          {formatINR(item.rate)}{" "}
+                          <span className="text-xs text-muted">
+                            / {item.rate_unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70 tabular-nums">
+                          {reachFormatter.format(item.monthly_reach)}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70 tabular-nums">
+                          {counts.propertiesCount}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70 tabular-nums">
+                          {screensLabel(counts)}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <ActiveToggle
+                            active={item.is_active}
+                            label={`${
+                              item.is_active ? "Deactivate" : "Activate"
+                            } ${item.name}`}
                             disabled={busy}
-                            className="h-8 px-3 text-xs"
-                          >
-                            <Pencil
-                              aria-hidden="true"
-                              className="h-3.5 w-3.5"
-                            />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleDelete(item)}
-                            disabled={busy}
-                            className="h-8 px-3 text-xs text-red-300 hover:bg-red-400/10 hover:text-red-200"
-                          >
-                            <Trash2
-                              aria-hidden="true"
-                              className="h-3.5 w-3.5"
-                            />
-                            {deleting ? "Deleting..." : "Delete"}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
+                            onChange={() => void handleToggle(item)}
+                          />
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditModal(item)}
+                              disabled={busy}
+                              className="h-8 px-3 text-xs"
+                            >
+                              <Pencil
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleDelete(item)}
+                              disabled={busy}
+                              className="h-8 px-3 text-xs text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                            >
+                              <Trash2
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                              {deleting ? "Deleting..." : "Delete"}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded ? (
+                        <tr className="bg-white/[0.02]">
+                          <td colSpan={9} className="px-5 pb-4">
+                            <div
+                              id={`package-properties-${item.id}`}
+                              className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                            >
+                              <PackagePropertiesDetail
+                                packageId={item.id}
+                                linksByPackage={linksByPackage}
+                                propertyById={propertyById}
+                                screensByProperty={screensByProperty}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -999,17 +1324,41 @@ export default function AdminAdPackagesClient({
               const type = item.type_id
                 ? typeById.get(item.type_id)
                 : null;
-              const propertyCount =
-                linksByPackage.get(item.id)?.length ?? 0;
+              const counts = packageCounts(
+                item,
+                statsByPackage,
+                linksByPackage,
+                propertyById,
+              );
+              const expanded = expandedPackages.has(item.id);
               const deleting = pending === `package-delete:${item.id}`;
 
               return (
                 <div key={item.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
-                        {item.name}
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => togglePackageExpanded(item.id)}
+                        aria-expanded={expanded}
+                        aria-controls={`package-properties-mobile-${item.id}`}
+                        className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                      >
+                        {expanded ? (
+                          <ChevronDown
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 shrink-0 text-white/50"
+                          />
+                        ) : (
+                          <ChevronRight
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 shrink-0 text-white/50"
+                          />
+                        )}
+                        <span className="truncate text-sm font-semibold text-white">
+                          {item.name}
+                        </span>
+                      </button>
                       <p className="mt-0.5 truncate text-xs text-muted">
                         {city?.name || "Unknown city"}
                         {type ? ` · ${type.name}` : ""}
@@ -1028,7 +1377,7 @@ export default function AdminAdPackagesClient({
                     />
                   </div>
 
-                  <dl className="mt-4 grid grid-cols-3 gap-3 text-xs">
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
                     <div>
                       <dt className="text-muted">Rate</dt>
                       <dd className="mt-0.5 font-medium text-white/80">
@@ -1047,7 +1396,13 @@ export default function AdminAdPackagesClient({
                     <div>
                       <dt className="text-muted">Properties</dt>
                       <dd className="mt-0.5 text-white/70 tabular-nums">
-                        {propertyCount}
+                        {counts.propertiesCount}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">Screens</dt>
+                      <dd className="mt-0.5 text-white/70 tabular-nums">
+                        {screensLabel(counts)}
                       </dd>
                     </div>
                   </dl>
@@ -1077,6 +1432,20 @@ export default function AdminAdPackagesClient({
                       {deleting ? "Deleting..." : "Delete"}
                     </Button>
                   </div>
+
+                  {expanded ? (
+                    <div
+                      id={`package-properties-mobile-${item.id}`}
+                      className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3"
+                    >
+                      <PackagePropertiesDetail
+                        packageId={item.id}
+                        linksByPackage={linksByPackage}
+                        propertyById={propertyById}
+                        screensByProperty={screensByProperty}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

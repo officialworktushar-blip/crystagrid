@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -11,34 +12,52 @@ import {
 } from "react";
 import {
   Building2,
+  ChevronDown,
+  ChevronRight,
   Image as ImageIcon,
   Loader2,
   Pencil,
   Plus,
-  Search,
   Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FilterBar from "@/components/ui/FilterBar";
 import type {
   AdCity,
   AdPlace,
   AdProperty,
+  AdPropertyScreen,
+  AdPropertyStats,
   AdPropertyType,
   AdRateUnit,
 } from "@/lib/ads";
-import { formatINR, getAdImageUrl } from "@/lib/ads";
+import {
+  formatINR,
+  getAdImageUrl,
+  normalizeAdPropertyScreens,
+} from "@/lib/ads";
+import { formatRelativeTime } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useFilters } from "@/lib/useFilters";
 
 type Notice = {
   type: "success" | "error";
   message: string;
 };
 
-type ActiveFilter = "all" | "active" | "inactive";
+type PropertyFilters = {
+  search: string;
+  city: string;
+  place: string;
+  type: string;
+  status: string;
+  screens: string;
+  withoutScreens: boolean;
+};
 
 type PropertyForm = {
   id: string | null;
@@ -47,12 +66,18 @@ type PropertyForm = {
   place_id: string;
   type_id: string;
   description: string;
-  screens_count: string;
   monthly_reach: string;
   rate: string;
   rate_unit: AdRateUnit;
   is_active: boolean;
   image_path: string | null;
+};
+
+type PropertyScreensState = {
+  rows: AdPropertyScreen[];
+  loading: boolean;
+  error: string | null;
+  loaded: boolean;
 };
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -91,6 +116,35 @@ function compareRows(
   b: { sort: number; name: string },
 ) {
   return a.sort - b.sort || a.name.localeCompare(b.name);
+}
+
+function screenCounts(
+  property: AdProperty,
+  statsById: Map<string, AdPropertyStats>,
+) {
+  const stat = statsById.get(property.id);
+
+  return {
+    count: stat?.screens_count ?? property.screens_count ?? 0,
+    online: stat?.online_count ?? 0,
+  };
+}
+
+function screensLabel(counts: { count: number; online: number }) {
+  return `${counts.count} screens (${counts.online} online)`;
+}
+
+function screenLocation(screen: AdPropertyScreen) {
+  const parts = [
+    screen.block,
+    screen.spot,
+    screen.shop_name ? `Shop: ${screen.shop_name}` : null,
+  ].filter(
+    (value): value is string =>
+      typeof value === "string" && value.trim().length > 0,
+  );
+
+  return parts.length > 0 ? parts.join(" · ") : "Not set";
 }
 
 function parseNonNegativeInteger(value: string): number | null {
@@ -138,6 +192,18 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function createInitialFilters(withoutScreens: boolean): PropertyFilters {
+  return {
+    search: "",
+    city: "",
+    place: "",
+    type: "",
+    status: "",
+    screens: "",
+    withoutScreens,
+  };
+}
+
 function createEmptyForm(cities: AdCity[]): PropertyForm {
   return {
     id: null,
@@ -146,7 +212,6 @@ function createEmptyForm(cities: AdCity[]): PropertyForm {
     place_id: "",
     type_id: "",
     description: "",
-    screens_count: "0",
     monthly_reach: "0",
     rate: "",
     rate_unit: "week",
@@ -222,28 +287,99 @@ function ActiveToggle({
   );
 }
 
+function PropertyScreensContent({
+  state,
+}: {
+  state?: PropertyScreensState;
+}) {
+  if (!state || (state.loading && !state.loaded)) {
+    return <p className="text-xs text-muted">Loading screens...</p>;
+  }
+
+  if (state.error) {
+    return (
+      <p role="alert" className="text-xs text-red-300">
+        Screens could not be loaded. {state.error}
+      </p>
+    );
+  }
+
+  if (state.rows.length === 0) {
+    return <p className="text-xs text-muted">No screens found.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        Screens
+      </p>
+      <ul className="space-y-2">
+        {state.rows.map((screen) => (
+          <li
+            key={screen.screen_id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-xs"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-white">
+                {screen.screen_name || screen.screen_id}
+              </p>
+              <p className="mt-0.5 text-muted">{screenLocation(screen)}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                  screen.online
+                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+                    : "border-white/10 bg-white/5 text-white/50",
+                )}
+              >
+                {screen.online ? "Online" : "Offline"}
+              </span>
+              <span className="text-muted">
+                Last seen: {formatRelativeTime(screen.last_seen)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function AdminAdPropertiesClient({
   cities,
   places,
   propertyTypes,
   properties: initialProperties,
+  propertyStats,
+  withoutScreens = false,
   loadError,
 }: {
   cities: AdCity[];
   places: AdPlace[];
   propertyTypes: AdPropertyType[];
   properties: AdProperty[];
+  propertyStats: AdPropertyStats[];
+  withoutScreens?: boolean;
   loadError: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const initialFilters = useMemo(
+    () => createInitialFilters(withoutScreens),
+    [withoutScreens],
+  );
+  const { filters, set, clear } = useFilters(initialFilters);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [properties, setProperties] =
     useState<AdProperty[]>(initialProperties);
-  const [cityFilter, setCityFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [placeFilter, setPlaceFilter] = useState("all");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
-  const [query, setQuery] = useState("");
+  const [expandedProperties, setExpandedProperties] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [screensByProperty, setScreensByProperty] = useState<
+    Record<string, PropertyScreensState>
+  >({});
+  const screensRequestRef = useRef<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<PropertyForm>(() =>
     createEmptyForm(cities),
@@ -282,13 +418,22 @@ export default function AdminAdPropertiesClient({
       new Map(sortedTypes.map((type) => [type.id, type] as const)),
     [sortedTypes],
   );
+  const statsById = useMemo(
+    () =>
+      new Map(
+        propertyStats.map(
+          (stat) => [stat.property_id, stat] as const,
+        ),
+      ),
+    [propertyStats],
+  );
 
   const filterPlaceOptions = useMemo(
     () =>
       sortedPlaces.filter(
-        (place) => cityFilter === "all" || place.city_id === cityFilter,
+        (place) => !filters.city || place.city_id === filters.city,
       ),
-    [cityFilter, sortedPlaces],
+    [filters.city, sortedPlaces],
   );
 
   const formPlaceOptions = useMemo(
@@ -298,33 +443,41 @@ export default function AdminAdPropertiesClient({
   );
 
   const visibleProperties = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = filters.search.trim().toLowerCase();
 
     return properties
       .filter((property) => {
-        if (
-          cityFilter !== "all" &&
-          property.city_id !== cityFilter
-        ) {
+        const counts = screenCounts(property, statsById);
+
+        if (filters.city && property.city_id !== filters.city) {
           return false;
         }
 
-        if (typeFilter !== "all" && property.type_id !== typeFilter) {
+        if (filters.type && property.type_id !== filters.type) {
           return false;
         }
 
-        if (
-          placeFilter !== "all" &&
-          property.place_id !== placeFilter
-        ) {
+        if (filters.place && property.place_id !== filters.place) {
           return false;
         }
 
-        if (activeFilter === "active" && !property.is_active) {
+        if (filters.status === "active" && !property.is_active) {
           return false;
         }
 
-        if (activeFilter === "inactive" && property.is_active) {
+        if (filters.status === "inactive" && property.is_active) {
+          return false;
+        }
+
+        if (filters.screens === "with" && counts.count === 0) {
+          return false;
+        }
+
+        if (filters.screens === "without" && counts.count > 0) {
+          return false;
+        }
+
+        if (filters.withoutScreens && counts.count > 0) {
           return false;
         }
 
@@ -334,12 +487,9 @@ export default function AdminAdPropertiesClient({
 
         const values = [
           property.name,
-          property.description,
-          cityById.get(property.city_id)?.name,
           property.place_id
             ? placeById.get(property.place_id)?.name
             : null,
-          property.type_id ? typeById.get(property.type_id)?.name : null,
         ];
 
         return values.some((value) =>
@@ -347,17 +497,7 @@ export default function AdminAdPropertiesClient({
         );
       })
       .sort(compareRows);
-  }, [
-    activeFilter,
-    cityById,
-    cityFilter,
-    placeById,
-    placeFilter,
-    properties,
-    query,
-    typeById,
-    typeFilter,
-  ]);
+  }, [filters, placeById, properties, statsById]);
 
   const existingImageUrl =
     form.image_path && !removeExistingImage
@@ -431,7 +571,6 @@ export default function AdminAdPropertiesClient({
       place_id: property.place_id ?? "",
       type_id: property.type_id ?? "",
       description: property.description ?? "",
-      screens_count: String(property.screens_count),
       monthly_reach: String(property.monthly_reach),
       rate: String(property.rate),
       rate_unit: property.rate_unit,
@@ -447,19 +586,90 @@ export default function AdminAdPropertiesClient({
   }
 
   function handleCityFilterChange(value: string) {
-    setCityFilter(value);
+    set("city", value);
 
-    if (placeFilter !== "all") {
+    if (filters.place) {
       const selectedPlace = places.find(
-        (place) => place.id === placeFilter,
+        (place) => place.id === filters.place,
       );
 
       if (
         !selectedPlace ||
-        (value !== "all" && selectedPlace.city_id !== value)
+        (value !== "" && selectedPlace.city_id !== value)
       ) {
-        setPlaceFilter("all");
+        set("place", "");
       }
+    }
+  }
+
+  async function loadPropertyScreens(propertyId: string) {
+    if (screensRequestRef.current.has(propertyId)) {
+      return;
+    }
+
+    screensRequestRef.current.add(propertyId);
+    setScreensByProperty((current) => ({
+      ...current,
+      [propertyId]: {
+        rows: [],
+        loading: true,
+        error: null,
+        loaded: false,
+      },
+    }));
+
+    try {
+      const { data, error } = await supabase.rpc("property_screens", {
+        p_property: propertyId,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setScreensByProperty((current) => ({
+        ...current,
+        [propertyId]: {
+          rows: normalizeAdPropertyScreens(data),
+          loading: false,
+          error: null,
+          loaded: true,
+        },
+      }));
+    } catch (error) {
+      screensRequestRef.current.delete(propertyId);
+      setScreensByProperty((current) => ({
+        ...current,
+        [propertyId]: {
+          rows: [],
+          loading: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Screens could not be loaded.",
+          loaded: true,
+        },
+      }));
+    }
+  }
+
+  function togglePropertyExpanded(propertyId: string) {
+    const willExpand = !expandedProperties.has(propertyId);
+
+    setExpandedProperties((current) => {
+      const next = new Set(current);
+
+      if (next.has(propertyId)) {
+        next.delete(propertyId);
+      } else {
+        next.add(propertyId);
+      }
+
+      return next;
+    });
+
+    if (willExpand) {
+      void loadPropertyScreens(propertyId);
     }
   }
 
@@ -521,7 +731,6 @@ export default function AdminAdPropertiesClient({
 
     const name = form.name.trim();
     const cityId = form.city_id;
-    const screens = parseNonNegativeInteger(form.screens_count);
     const reach = parseNonNegativeInteger(form.monthly_reach);
     const rate = Number(form.rate);
 
@@ -532,13 +741,6 @@ export default function AdminAdPropertiesClient({
 
     if (!cityId || !cityById.has(cityId)) {
       setFormError("Choose a valid city.");
-      return;
-    }
-
-    if (screens === null) {
-      setFormError(
-        "Screens count must be a whole number of 0 or more.",
-      );
       return;
     }
 
@@ -598,7 +800,6 @@ export default function AdminAdPropertiesClient({
         place_id: placeId,
         type_id: typeId,
         description: description || null,
-        screens_count: screens,
         monthly_reach: reach,
         rate,
         rate_unit: form.rate_unit,
@@ -619,6 +820,7 @@ export default function AdminAdPropertiesClient({
         const optimistic: AdProperty = {
           ...previous,
           ...payload,
+          screens_count: previous.screens_count ?? 0,
         };
 
         setProperties((current) =>
@@ -678,6 +880,7 @@ export default function AdminAdPropertiesClient({
       const optimistic: AdProperty = {
         id: tempId,
         ...payload,
+        screens_count: 0,
         sort,
       };
 
@@ -844,136 +1047,86 @@ export default function AdminAdPropertiesClient({
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-white">
-            Ad properties
-          </h2>
-          <p className="mt-1 text-sm text-body">
-            Showing {visibleProperties.length} of {properties.length}{" "}
-            {properties.length === 1 ? "property" : "properties"}.
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold tracking-tight text-white">
+          Ad properties
+        </h2>
         <Button onClick={openAddModal} disabled={busy}>
           <Plus aria-hidden="true" className="h-4 w-4" />
           Add Property
         </Button>
       </div>
 
-      <Card className="p-4 hover:border-white/10 hover:shadow-none sm:p-5">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))]">
-          <div>
-            <label
-              htmlFor="property-search"
-              className="mb-1 block text-xs text-muted"
-            >
-              Search
-            </label>
-            <div className="relative">
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              />
-              <input
-                id="property-search"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Name, description, city, place, or type"
-                className={cn(inputClass, "pl-10")}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="property-city-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              City
-            </label>
-            <select
-              id="property-city-filter"
-              value={cityFilter}
-              onChange={(event) =>
-                handleCityFilterChange(event.target.value)
-              }
-              className={inputClass}
-            >
-              <option value="all">All cities</option>
-              {sortedCities.map((city) => (
-                <option key={city.id} value={city.id}>
-                  {city.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="property-type-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              Type
-            </label>
-            <select
-              id="property-type-filter"
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All types</option>
-              {sortedTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="property-place-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              Place
-            </label>
-            <select
-              id="property-place-filter"
-              value={placeFilter}
-              onChange={(event) => setPlaceFilter(event.target.value)}
-              className={inputClass}
-            >
-              <option value="all">All places</option>
-              {filterPlaceOptions.map((place) => (
-                <option key={place.id} value={place.id}>
-                  {place.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label
-              htmlFor="property-active-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              Status
-            </label>
-            <select
-              id="property-active-filter"
-              value={activeFilter}
-              onChange={(event) =>
-                setActiveFilter(event.target.value as ActiveFilter)
-              }
-              className={inputClass}
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-      </Card>
+      <FilterBar
+        search={{
+          value: filters.search,
+          onChange: (value) => set("search", value),
+          placeholder: "Search name or place",
+        }}
+        selects={[
+          {
+            key: "city",
+            label: "City",
+            value: filters.city,
+            onChange: handleCityFilterChange,
+            options: sortedCities.map((city) => ({
+              value: city.id,
+              label: city.name,
+            })),
+          },
+          {
+            key: "place",
+            label: "Place (location)",
+            value: filters.place,
+            onChange: (value) => set("place", value),
+            options: filterPlaceOptions.map((place) => ({
+              value: place.id,
+              label: place.name,
+            })),
+          },
+          {
+            key: "type",
+            label: "Type",
+            value: filters.type,
+            onChange: (value) => set("type", value),
+            options: sortedTypes.map((type) => ({
+              value: type.id,
+              label: type.name,
+            })),
+          },
+          {
+            key: "status",
+            label: "Status",
+            value: filters.status,
+            onChange: (value) => set("status", value),
+            options: [
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ],
+          },
+          {
+            key: "screens",
+            label: "Screens",
+            value: filters.screens,
+            onChange: (value) => set("screens", value),
+            allLabel: "All screens",
+            options: [
+              { value: "with", label: "Has screens" },
+              { value: "without", label: "No screens" },
+            ],
+          },
+        ]}
+        toggles={[
+          {
+            key: "withoutScreens",
+            label: "Without screens only",
+            checked: filters.withoutScreens,
+            onChange: (value) => set("withoutScreens", value),
+          },
+        ]}
+        resultCount={visibleProperties.length}
+        total={properties.length}
+        onClear={clear}
+      />
 
       {visibleProperties.length === 0 ? (
         <Card className="flex flex-col items-center justify-center px-6 py-14 text-center hover:border-white/10 hover:shadow-none">
@@ -1046,89 +1199,125 @@ export default function AdminAdPropertiesClient({
                   const type = property.type_id
                     ? typeById.get(property.type_id)
                     : null;
+                  const expanded = expandedProperties.has(property.id);
+                  const counts = screenCounts(property, statsById);
                   const deleting =
                     pending === pendingKey("property-delete", property.id);
 
                   return (
-                    <tr
-                      key={property.id}
-                      className="transition duration-200 hover:bg-white/[0.03]"
-                    >
-                      <td className="max-w-[19rem] px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <PropertyThumbnail
-                            url={imageUrl}
-                            name={property.name}
-                          />
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-white">
-                              {property.name}
-                            </p>
-                            <p className="mt-0.5 truncate text-xs text-muted">
-                              {city?.name || "Unknown city"}
-                            </p>
+                    <Fragment key={property.id}>
+                      <tr className="transition duration-200 hover:bg-white/[0.03]">
+                        <td className="max-w-[19rem] px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <PropertyThumbnail
+                              url={imageUrl}
+                              name={property.name}
+                            />
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  togglePropertyExpanded(property.id)
+                                }
+                                aria-expanded={expanded}
+                                aria-controls={`property-screens-${property.id}`}
+                                className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                              >
+                                {expanded ? (
+                                  <ChevronDown
+                                    aria-hidden="true"
+                                    className="h-4 w-4 shrink-0 text-white/50"
+                                  />
+                                ) : (
+                                  <ChevronRight
+                                    aria-hidden="true"
+                                    className="h-4 w-4 shrink-0 text-white/50"
+                                  />
+                                )}
+                                <span className="truncate font-semibold text-white">
+                                  {property.name}
+                                </span>
+                              </button>
+                              <p className="mt-0.5 truncate text-xs text-muted">
+                                {city?.name || "Unknown city"}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70">
-                        {type?.name || "—"}
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70">
-                        {place?.name || "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3.5 font-medium text-white/80">
-                        {formatINR(property.rate)}{" "}
-                        <span className="text-xs text-muted">
-                          / {property.rate_unit}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70 tabular-nums">
-                        {reachFormatter.format(property.monthly_reach)}
-                      </td>
-                      <td className="px-4 py-3.5 text-white/70 tabular-nums">
-                        {property.screens_count}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <ActiveToggle
-                          active={property.is_active}
-                          label={`${
-                            property.is_active ? "Deactivate" : "Activate"
-                          } ${property.name}`}
-                          disabled={busy}
-                          onChange={() => void handleToggle(property)}
-                        />
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditModal(property)}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70">
+                          {type?.name || "—"}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70">
+                          {place?.name || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3.5 font-medium text-white/80">
+                          {formatINR(property.rate)}{" "}
+                          <span className="text-xs text-muted">
+                            / {property.rate_unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70 tabular-nums">
+                          {reachFormatter.format(property.monthly_reach)}
+                        </td>
+                        <td className="px-4 py-3.5 text-white/70 tabular-nums">
+                          {screensLabel(counts)}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <ActiveToggle
+                            active={property.is_active}
+                            label={`${
+                              property.is_active ? "Deactivate" : "Activate"
+                            } ${property.name}`}
                             disabled={busy}
-                            className="h-8 px-3 text-xs"
-                          >
-                            <Pencil
-                              aria-hidden="true"
-                              className="h-3.5 w-3.5"
-                            />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleDelete(property)}
-                            disabled={busy}
-                            className="h-8 px-3 text-xs text-red-300 hover:bg-red-400/10 hover:text-red-200"
-                          >
-                            <Trash2
-                              aria-hidden="true"
-                              className="h-3.5 w-3.5"
-                            />
-                            {deleting ? "Deleting..." : "Delete"}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
+                            onChange={() => void handleToggle(property)}
+                          />
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditModal(property)}
+                              disabled={busy}
+                              className="h-8 px-3 text-xs"
+                            >
+                              <Pencil
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleDelete(property)}
+                              disabled={busy}
+                              className="h-8 px-3 text-xs text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                            >
+                              <Trash2
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                              {deleting ? "Deleting..." : "Delete"}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded ? (
+                        <tr className="bg-white/[0.02]">
+                          <td colSpan={8} className="px-5 pb-4">
+                            <div
+                              id={`property-screens-${property.id}`}
+                              className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                            >
+                              <PropertyScreensContent
+                                state={screensByProperty[property.id]}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -1145,6 +1334,8 @@ export default function AdminAdPropertiesClient({
               const type = property.type_id
                 ? typeById.get(property.type_id)
                 : null;
+              const expanded = expandedProperties.has(property.id);
+              const counts = screenCounts(property, statsById);
               const deleting =
                 pending === pendingKey("property-delete", property.id);
 
@@ -1158,9 +1349,28 @@ export default function AdminAdPropertiesClient({
                         className="h-12 w-12"
                       />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">
-                          {property.name}
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => togglePropertyExpanded(property.id)}
+                          aria-expanded={expanded}
+                          aria-controls={`property-screens-mobile-${property.id}`}
+                          className="flex min-w-0 items-center gap-1.5 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                        >
+                          {expanded ? (
+                            <ChevronDown
+                              aria-hidden="true"
+                              className="h-3.5 w-3.5 shrink-0 text-white/50"
+                            />
+                          ) : (
+                            <ChevronRight
+                              aria-hidden="true"
+                              className="h-3.5 w-3.5 shrink-0 text-white/50"
+                            />
+                          )}
+                          <span className="truncate text-sm font-semibold text-white">
+                            {property.name}
+                          </span>
+                        </button>
                         <p className="mt-0.5 truncate text-xs text-muted">
                           {city?.name || "Unknown city"}
                           {place ? ` · ${place.name}` : ""}
@@ -1199,7 +1409,7 @@ export default function AdminAdPropertiesClient({
                     <div>
                       <dt className="text-muted">Screens</dt>
                       <dd className="mt-0.5 text-white/70 tabular-nums">
-                        {property.screens_count}
+                        {screensLabel(counts)}
                       </dd>
                     </div>
                   </dl>
@@ -1229,6 +1439,17 @@ export default function AdminAdPropertiesClient({
                       {deleting ? "Deleting..." : "Delete"}
                     </Button>
                   </div>
+
+                  {expanded ? (
+                    <div
+                      id={`property-screens-mobile-${property.id}`}
+                      className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3"
+                    >
+                      <PropertyScreensContent
+                        state={screensByProperty[property.id]}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -1395,27 +1616,10 @@ export default function AdminAdPropertiesClient({
                   </select>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="property-screens"
-                    className="mb-1 block text-xs text-muted"
-                  >
-                    Screens count
-                  </label>
-                  <input
-                    id="property-screens"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.screens_count}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        screens_count: event.target.value,
-                      }))
-                    }
-                    className={inputClass}
-                  />
+                <div className="sm:col-span-2">
+                  <p className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-muted">
+                    Screens are added by the Device Managers.
+                  </p>
                 </div>
 
                 <div>

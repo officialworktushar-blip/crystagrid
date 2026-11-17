@@ -11,28 +11,70 @@ import {
   CalendarDays,
   ClipboardList,
   Loader2,
+  Monitor,
   ReceiptText,
-  Search,
   X,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import type { AdBooking, AdBookingItem } from "@/lib/ad-bookings";
+import FilterBar from "@/components/ui/FilterBar";
+import type {
+  AdBooking,
+  AdBookingItem,
+  AdBookingScreen,
+} from "@/lib/ad-bookings";
 import {
   ADMIN_BOOKING_STATUSES,
   BOOKING_FILTER_STATUSES,
   bookingTimestamp,
   formatBookingId,
   formatBookingStatus,
+  normalizeAdBookingScreens,
 } from "@/lib/ad-bookings";
 import { formatAdminDate } from "@/lib/admin";
-import { formatINR } from "@/lib/ads";
+import type { AdCity } from "@/lib/ads";
+import { formatINR, todayIST } from "@/lib/ads";
+import { formatRelativeTime } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useFilters } from "@/lib/useFilters";
 
 type Notice = {
   type: "success" | "error";
   message: string;
+};
+
+type BookingScreensState = {
+  bookingId: string;
+  loading: boolean;
+  error: string | null;
+  screens: AdBookingScreen[];
+};
+
+type BookingFilters = {
+  search: string;
+  status: string;
+  city: string;
+  tier: string;
+  item: string;
+  dateFrom: string;
+  dateTo: string;
+  needsContent: boolean;
+  liveNow: boolean;
+  showDrafts: boolean;
+};
+
+const emptyFilters: BookingFilters = {
+  search: "",
+  status: "",
+  city: "",
+  tier: "",
+  item: "",
+  dateFrom: "",
+  dateTo: "",
+  needsContent: false,
+  liveNow: false,
+  showDrafts: false,
 };
 
 const inputClass =
@@ -87,40 +129,53 @@ function BookingStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ToggleSwitch({
-  active,
-  label,
-  disabled,
-  onChange,
-}: {
-  active: boolean;
-  label: string;
-  disabled?: boolean;
-  onChange: () => void;
-}) {
+function itemFilterValue(item: AdBookingItem): string | null {
+  const type =
+    item.type ??
+    (item.packageId && !item.propertyId
+      ? "package"
+      : item.propertyId
+        ? "property"
+        : null);
+  const id = type === "package" ? item.packageId : item.propertyId;
+
+  return type && id ? `${type}:${id}` : null;
+}
+
+function ContentChip({ hasContent }: { hasContent: boolean }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={active}
-      aria-label={label}
-      title={active ? "On" : "Off"}
-      disabled={disabled}
-      onClick={onChange}
+    <span
+      title={hasContent ? undefined : "Needs content"}
       className={cn(
-        "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:pointer-events-none disabled:opacity-50",
-        active
-          ? "brand-gradient border-transparent"
-          : "border-white/10 bg-white/10",
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+        hasContent
+          ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
+          : "border-amber-400/20 bg-amber-400/10 text-amber-300",
       )}
     >
-      <span
-        className={cn(
-          "inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200",
-          active ? "translate-x-6" : "translate-x-1",
-        )}
-      />
-    </button>
+      {hasContent ? "Assigned" : "No content"}
+    </span>
+  );
+}
+
+function screensLabel(screens: AdBookingScreen[]): string {
+  const online = screens.filter((screen) => screen.online).length;
+
+  return `${screens.length} screens (${online} online)`;
+}
+
+function bookingScreenLocation(screen: AdBookingScreen): string {
+  return (
+    [
+      screen.block,
+      screen.spot,
+      screen.shop_name ? `Shop: ${screen.shop_name}` : null,
+    ]
+      .filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      )
+      .join(" · ") || "Not set"
   );
 }
 
@@ -144,42 +199,156 @@ function itemRateLabel(item: AdBookingItem): string {
 
 export default function AdminAdBookingsClient({
   bookings: initialBookings,
+  cities,
   loadError,
 }: {
   bookings: AdBooking[];
+  cities: AdCity[];
   loadError: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const { filters, set, clear } = useFilters(emptyFilters);
   const [bookings, setBookings] =
     useState<AdBooking[]>(initialBookings);
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [showDrafts, setShowDrafts] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState("");
   const [draftNotes, setDraftNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [screensState, setScreensState] =
+    useState<BookingScreensState | null>(null);
+
+  const cityOptions = useMemo(() => {
+    const names = new Set<string>();
+
+    for (const city of cities) {
+      const name = city.name.trim();
+
+      if (name) {
+        names.add(name);
+      }
+    }
+
+    for (const booking of bookings) {
+      const name = booking.city?.trim();
+
+      if (name) {
+        names.add(name);
+      }
+    }
+
+    return [...names]
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [bookings, cities]);
+
+  const tierOptions = useMemo(() => {
+    const tiers = new Set<string>();
+
+    for (const booking of bookings) {
+      const tier = booking.tier?.trim();
+
+      if (tier) {
+        tiers.add(tier);
+      }
+    }
+
+    return [...tiers]
+      .sort((a, b) => a.localeCompare(b))
+      .map((tier) => ({ value: tier, label: tier }));
+  }, [bookings]);
+
+  const itemOptions = useMemo(() => {
+    const options = new Map<string, string>();
+
+    for (const booking of bookings) {
+      for (const item of booking.items) {
+        const value = itemFilterValue(item);
+        const label = item.name.trim();
+
+        if (value && label && !options.has(value)) {
+          options.set(value, label);
+        }
+      }
+    }
+
+    return [...options.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label }));
+  }, [bookings]);
 
   const draftCount = bookings.filter(
     (booking) => booking.status === "draft",
   ).length;
 
   const visibleBookings = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = filters.search.trim().toLowerCase();
+    const today = todayIST();
 
     return bookings
       .filter((booking) => {
-        if (booking.status === "draft" && !showDrafts) {
+        if (booking.status === "draft" && !filters.showDrafts) {
+          return false;
+        }
+
+        if (filters.status && booking.status !== filters.status) {
           return false;
         }
 
         if (
-          statusFilter !== "all" &&
-          booking.status !== statusFilter
+          filters.city &&
+          booking.city?.trim().toLowerCase() !==
+            filters.city.trim().toLowerCase()
         ) {
           return false;
+        }
+
+        if (
+          filters.tier &&
+          booking.tier?.trim().toLowerCase() !==
+            filters.tier.trim().toLowerCase()
+        ) {
+          return false;
+        }
+
+        if (
+          filters.item &&
+          !booking.items.some(
+            (item) => itemFilterValue(item) === filters.item,
+          )
+        ) {
+          return false;
+        }
+
+        const startDate = booking.startDate?.slice(0, 10) ?? "";
+
+        if (filters.dateFrom && (!startDate || startDate < filters.dateFrom)) {
+          return false;
+        }
+
+        if (filters.dateTo && (!startDate || startDate > filters.dateTo)) {
+          return false;
+        }
+
+        if (filters.needsContent && booking.hasContent) {
+          return false;
+        }
+
+        if (filters.liveNow) {
+          const status = booking.status.trim().toLowerCase();
+          const endDate = booking.endDate?.slice(0, 10) ?? "";
+          const isLive =
+            status === "running" ||
+            (status === "confirmed" &&
+              Boolean(startDate) &&
+              Boolean(endDate) &&
+              startDate <= today &&
+              today <= endDate);
+
+          if (!isLive) {
+            return false;
+          }
         }
 
         if (!normalizedQuery) {
@@ -191,10 +360,6 @@ export default function AdminAdBookingsClient({
           formatBookingId(booking.id),
           booking.customerName,
           booking.companyName,
-          booking.city,
-          booking.tier,
-          booking.promoCode,
-          formatBookingStatus(booking.status),
           ...booking.items.flatMap((item) => [item.name, item.detail]),
         ];
 
@@ -203,7 +368,7 @@ export default function AdminAdBookingsClient({
         );
       })
       .sort((a, b) => bookingTimestamp(b) - bookingTimestamp(a));
-  }, [bookings, query, showDrafts, statusFilter]);
+  }, [bookings, filters]);
 
   const selected = useMemo(
     () => bookings.find((booking) => booking.id === selectedId) ?? null,
@@ -225,14 +390,59 @@ export default function AdminAdBookingsClient({
 
   const hiddenOnlyDrafts =
     visibleBookings.length === 0 &&
-    !showDrafts &&
-    statusFilter === "all" &&
+    !filters.showDrafts &&
+    !filters.status &&
     draftCount > 0;
 
   const closeDrawer = useCallback(() => {
     setSelectedId(null);
     setDrawerError(null);
   }, []);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setScreensState(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    setScreensState({
+      bookingId: selectedId,
+      loading: true,
+      error: null,
+      screens: [],
+    });
+
+    void supabase
+      .rpc("booking_screens", { p_booking: selectedId })
+      .then(({ data, error }) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (error) {
+          setScreensState({
+            bookingId: selectedId,
+            loading: false,
+            error: error.message,
+            screens: [],
+          });
+          return;
+        }
+
+        setScreensState({
+          bookingId: selectedId,
+          loading: false,
+          error: null,
+          screens: normalizeAdBookingScreens(data),
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, supabase]);
 
   useEffect(() => {
     if (!selected) {
@@ -257,10 +467,10 @@ export default function AdminAdBookingsClient({
   }, [closeDrawer, saving, selected]);
 
   function handleStatusFilterChange(value: string) {
-    setStatusFilter(value);
+    set("status", value);
 
     if (value === "draft") {
-      setShowDrafts(true);
+      set("showDrafts", true);
     }
   }
 
@@ -347,7 +557,7 @@ export default function AdminAdBookingsClient({
         <p className="mt-1 text-sm text-body">
           Showing {visibleBookings.length} of {bookings.length}{" "}
           {bookings.length === 1 ? "booking" : "bookings"}.
-          {!showDrafts && draftCount > 0
+          {!filters.showDrafts && draftCount > 0
             ? ` ${draftCount} ${
                 draftCount === 1 ? "draft is" : "drafts are"
               } hidden.`
@@ -355,72 +565,78 @@ export default function AdminAdBookingsClient({
         </p>
       </div>
 
-      <Card className="p-4 hover:border-white/10 hover:shadow-none sm:p-5">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(18rem,0.9fr)]">
-          <div>
-            <label
-              htmlFor="booking-search"
-              className="mb-1 block text-xs text-muted"
-            >
-              Search
-            </label>
-            <div className="relative">
-              <Search
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              />
-              <input
-                id="booking-search"
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Booking, customer, city, tier, or promo"
-                className={cn(inputClass, "pl-10")}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="booking-status-filter"
-              className="mb-1 block text-xs text-muted"
-            >
-              Status
-            </label>
-            <select
-              id="booking-status-filter"
-              value={statusFilter}
-              onChange={(event) =>
-                handleStatusFilterChange(event.target.value)
-              }
-              className={inputClass}
-            >
-              <option value="all">All statuses</option>
-              {BOOKING_FILTER_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {formatBookingStatus(status)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-white">
-                Show drafts
-              </p>
-              <p className="mt-0.5 text-xs text-muted">
-                Drafts stay hidden by default.
-              </p>
-            </div>
-            <ToggleSwitch
-              active={showDrafts}
-              label="Show draft bookings"
-              onChange={() => setShowDrafts((current) => !current)}
-            />
-          </div>
-        </div>
-      </Card>
+      <FilterBar
+        search={{
+          value: filters.search,
+          onChange: (value) => set("search", value),
+          placeholder: "Search bookings",
+        }}
+        selects={[
+          {
+            key: "status",
+            label: "Status",
+            value: filters.status,
+            onChange: handleStatusFilterChange,
+            options: BOOKING_FILTER_STATUSES.map((status) => ({
+              value: status,
+              label: formatBookingStatus(status),
+            })),
+          },
+          {
+            key: "city",
+            label: "City",
+            value: filters.city,
+            onChange: (value) => set("city", value),
+            options: cityOptions,
+          },
+          {
+            key: "tier",
+            label: "Tier",
+            value: filters.tier,
+            onChange: (value) => set("tier", value),
+            options: tierOptions,
+          },
+          {
+            key: "item",
+            label: "Property / package",
+            value: filters.item,
+            onChange: (value) => set("item", value),
+            options: itemOptions,
+          },
+        ]}
+        toggles={[
+          {
+            key: "needsContent",
+            label: "Needs content",
+            checked: filters.needsContent,
+            onChange: (value) => set("needsContent", value),
+          },
+          {
+            key: "liveNow",
+            label: "Live now",
+            checked: filters.liveNow,
+            onChange: (value) => set("liveNow", value),
+          },
+          {
+            key: "showDrafts",
+            label: "Show drafts",
+            checked: filters.showDrafts,
+            onChange: (value) => set("showDrafts", value),
+          },
+        ]}
+        dateRange={{
+          label: "Start date",
+          from: filters.dateFrom,
+          to: filters.dateTo,
+          onChange: (range) => {
+            set("dateFrom", range.from);
+            set("dateTo", range.to);
+          },
+        }}
+        resultCount={visibleBookings.length}
+        total={bookings.length}
+        onClear={clear}
+      />
 
       {visibleBookings.length === 0 ? (
         <Card className="flex flex-col items-center justify-center px-6 py-14 text-center hover:border-white/10 hover:shadow-none">
@@ -444,7 +660,7 @@ export default function AdminAdBookingsClient({
           {hiddenOnlyDrafts ? (
             <Button
               variant="secondary"
-              onClick={() => setShowDrafts(true)}
+              onClick={() => set("showDrafts", true)}
               className="mt-5"
             >
               Show drafts
@@ -454,7 +670,7 @@ export default function AdminAdBookingsClient({
       ) : (
         <Card className="overflow-hidden p-0 hover:border-white/10 hover:shadow-none">
           <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[82rem] text-left text-sm">
+            <table className="w-full min-w-[88rem] text-left text-sm">
               <thead className="border-b border-white/5 bg-white/[0.02] text-xs uppercase tracking-[0.12em] text-muted">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold">
@@ -483,6 +699,9 @@ export default function AdminAdBookingsClient({
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
                     Status
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Content
                   </th>
                   <th
                     scope="col"
@@ -546,6 +765,9 @@ export default function AdminAdBookingsClient({
                     <td className="px-4 py-3.5">
                       <BookingStatusBadge status={booking.status} />
                     </td>
+                    <td className="px-4 py-3.5">
+                      <ContentChip hasContent={booking.hasContent} />
+                    </td>
                     <td className="px-5 py-3.5 text-right">
                       <ArrowRight
                         aria-hidden="true"
@@ -578,7 +800,10 @@ export default function AdminAdBookingsClient({
                       {booking.companyName || "No company"}
                     </p>
                   </div>
-                  <BookingStatusBadge status={booking.status} />
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <BookingStatusBadge status={booking.status} />
+                    <ContentChip hasContent={booking.hasContent} />
+                  </div>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
@@ -658,6 +883,7 @@ export default function AdminAdBookingsClient({
                 </h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <BookingStatusBadge status={selected.status} />
+                  <ContentChip hasContent={selected.hasContent} />
                   <span className="text-xs text-muted">
                     {selected.companyName || "No company"} ·{" "}
                     {formatAdminDate(selected.createdAt)}
@@ -746,6 +972,90 @@ export default function AdminAdBookingsClient({
                       </li>
                     ))}
                   </ul>
+                )}
+              </section>
+
+              <section>
+                <div className="flex items-center gap-2">
+                  <Monitor
+                    aria-hidden="true"
+                    className="h-4 w-4 text-brand-sky"
+                  />
+                  <h3 className="text-sm font-semibold text-white">
+                    Where it runs
+                  </h3>
+                </div>
+
+                {!screensState ||
+                screensState.bookingId !== selected.id ||
+                screensState.loading ? (
+                  <p className="mt-3 text-xs text-muted">
+                    Loading screens...
+                  </p>
+                ) : screensState.error ? (
+                  <p role="alert" className="mt-3 text-xs text-red-300">
+                    Screens could not be loaded. {screensState.error}
+                  </p>
+                ) : screensState.screens.length === 0 ? (
+                  <p className="mt-3 rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-body">
+                    No screens are assigned to this booking.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                      {screensLabel(screensState.screens)}
+                    </p>
+                    <ul className="space-y-2">
+                      {screensState.screens.map((screen) => (
+                        <li
+                          key={screen.screen_id}
+                          className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-white">
+                                {screen.screen_name || screen.screen_id}
+                              </p>
+                              {screen.screen_name &&
+                              screen.screen_name !== screen.screen_id ? (
+                                <p className="mt-0.5 font-mono text-xs text-muted">
+                                  {screen.screen_id}
+                                </p>
+                              ) : null}
+                              <p className="mt-1 text-xs text-white/70">
+                                {[screen.property_name, screen.place_name]
+                                  .filter(
+                                    (value): value is string =>
+                                      typeof value === "string" &&
+                                      value.trim().length > 0,
+                                  )
+                                  .join(" · ") || "Property not set"}
+                              </p>
+                              <p className="mt-0.5 text-xs text-muted">
+                                {bookingScreenLocation(screen)}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5">
+                              <span
+                                className={cn(
+                                  "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                                  screen.online
+                                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+                                    : "border-white/10 bg-white/5 text-white/50",
+                                )}
+                              >
+                                {screen.online ? "Online" : "Offline"}
+                              </span>
+                              <span className="text-xs text-muted">
+                                Last seen:{" "}
+                                {formatRelativeTime(screen.last_seen)}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </section>
 

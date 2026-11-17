@@ -63,6 +63,29 @@ export interface AdPackageProperty {
   property_id: string;
 }
 
+export interface AdPropertyStats {
+  property_id: string;
+  screens_count: number;
+  online_count: number;
+}
+
+export interface AdPackageStats {
+  package_id: string;
+  properties_count: number;
+  screens_count: number;
+  online_count: number;
+}
+
+export interface AdPropertyScreen {
+  screen_id: string;
+  screen_name: string | null;
+  online: boolean;
+  last_seen: string | null;
+  block: string | null;
+  spot: string | null;
+  shop_name: string | null;
+}
+
 export interface AdSettings {
   id: number;
   online_discount_pct: number;
@@ -660,4 +683,106 @@ export function normalizeSavedBookingResult(
       "draft",
     quote,
   };
+}
+
+function toCount(value: unknown): number {
+  const parsed = pickNumber(value !== null && typeof value === "object"
+    ? (value as UnknownRecord)
+    : { value },
+    ["value", "count", "total", "screens", "properties"],
+  );
+
+  return Math.max(0, Math.round(parsed ?? 0));
+}
+
+function toBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value > 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    return ["1", "true", "yes", "online", "active"].includes(normalized);
+  }
+
+  return false;
+}
+
+export function normalizeAdPropertyStats(value: unknown): AdPropertyStats[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows.flatMap((entry) => {
+    const row = asRecord(entry);
+    const propertyId = row ? pickString(row, ["property_id", "id"]) : null;
+
+    if (!row || !propertyId) {
+      return [];
+    }
+
+    return [
+      {
+        property_id: propertyId,
+        screens_count: toCount(pickNumber(row, ["screens_count", "screens"])),
+        online_count: toCount(pickNumber(row, ["online_count", "online"])),
+      },
+    ];
+  });
+}
+
+export function normalizeAdPackageStats(value: unknown): AdPackageStats[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows.flatMap((entry) => {
+    const row = asRecord(entry);
+    const packageId = row ? pickString(row, ["package_id", "id"]) : null;
+
+    if (!row || !packageId) {
+      return [];
+    }
+
+    return [
+      {
+        package_id: packageId,
+        properties_count: toCount(
+          pickNumber(row, ["properties_count", "properties"]),
+        ),
+        screens_count: toCount(pickNumber(row, ["screens_count", "screens"])),
+        online_count: toCount(pickNumber(row, ["online_count", "online"])),
+      },
+    ];
+  });
+}
+
+export function normalizeAdPropertyScreens(
+  value: unknown,
+): AdPropertyScreen[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows.flatMap((entry) => {
+    const row = asRecord(entry);
+    const screenId = row
+      ? pickString(row, ["screen_id", "id", "device_id"])
+      : null;
+
+    if (!row || !screenId) {
+      return [];
+    }
+
+    return [
+      {
+        screen_id: screenId,
+        screen_name: pickString(row, ["screen_name", "name", "title"]),
+        online: toBoolean(row.online ?? row.is_online ?? row.status),
+        last_seen: pickString(row, ["last_seen", "last_seen_at"]),
+        block: pickString(row, ["block", "block_name"]),
+        spot: pickString(row, ["spot", "spot_name"]),
+        shop_name: pickString(row, ["shop_name", "shop"]),
+      },
+    ];
+  });
 }

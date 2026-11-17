@@ -2,13 +2,27 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FilterBar from "@/components/ui/FilterBar";
 import { formatAdminDate } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/client";
 import type { Lead } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { useFilters } from "@/lib/useFilters";
+
+type LeadFilters = {
+  search: string;
+  dateFrom: string;
+  dateTo: string;
+  withMessage: boolean;
+};
+
+const emptyFilters: LeadFilters = {
+  search: "",
+  dateFrom: "",
+  dateTo: "",
+  withMessage: false,
+};
 
 export default function AdminLeadsClient({
   leads,
@@ -18,27 +32,44 @@ export default function AdminLeadsClient({
   loadError: string | null;
 }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const { filters, set, clear } = useFilters(emptyFilters);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const visibleLeads = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = filters.search.trim().toLowerCase();
 
-    if (!normalizedQuery) {
-      return leads;
-    }
+    return leads.filter((lead) => {
+      if (
+        normalizedQuery &&
+        ![
+          lead.name,
+          lead.email,
+          lead.phone,
+          lead.company,
+          lead.message,
+        ].some((value) => value?.toLowerCase().includes(normalizedQuery))
+      ) {
+        return false;
+      }
 
-    return leads.filter((lead) =>
-      [
-        lead.name,
-        lead.email,
-        lead.phone,
-        lead.company,
-        lead.message,
-      ].some((value) => value?.toLowerCase().includes(normalizedQuery)),
-    );
-  }, [leads, query]);
+      const createdDate = lead.created_at.slice(0, 10);
+
+      if (filters.dateFrom && (!createdDate || createdDate < filters.dateFrom)) {
+        return false;
+      }
+
+      if (filters.dateTo && (!createdDate || createdDate > filters.dateTo)) {
+        return false;
+      }
+
+      if (filters.withMessage && !lead.message?.trim()) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filters, leads]);
 
   async function handleDelete(lead: Lead) {
     const confirmed = window.confirm(
@@ -67,20 +98,34 @@ export default function AdminLeadsClient({
 
   return (
     <div className="space-y-4">
-      <div className="relative w-full sm:max-w-sm">
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search name, email, or message"
-          aria-label="Search leads"
-          className="h-10 w-full rounded-full border border-white/10 bg-white/5 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-muted focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40"
-        />
-      </div>
+      <FilterBar
+        search={{
+          value: filters.search,
+          onChange: (value) => set("search", value),
+          placeholder: "Search leads",
+        }}
+        selects={[]}
+        toggles={[
+          {
+            key: "withMessage",
+            label: "With message",
+            checked: filters.withMessage,
+            onChange: (value) => set("withMessage", value),
+          },
+        ]}
+        dateRange={{
+          label: "Received",
+          from: filters.dateFrom,
+          to: filters.dateTo,
+          onChange: (range) => {
+            set("dateFrom", range.from);
+            set("dateTo", range.to);
+          },
+        }}
+        resultCount={visibleLeads.length}
+        total={leads.length}
+        onClear={clear}
+      />
 
       {loadError ? (
         <p
@@ -105,12 +150,12 @@ export default function AdminLeadsClient({
           <p className="text-sm font-medium text-white">
             {leads.length === 0
               ? "No leads yet."
-              : "No leads match your search."}
+              : "No leads match your filters."}
           </p>
           <p className="mt-1 text-sm text-body">
             {leads.length === 0
               ? "Messages from the contact form will appear here."
-              : "Try a different name, email, company, or message."}
+              : "Try a different search, date range, or message filter."}
           </p>
         </Card>
       ) : (
@@ -242,15 +287,6 @@ export default function AdminLeadsClient({
           </div>
         </Card>
       )}
-
-      <p
-        className={cn(
-          "text-xs text-muted",
-          visibleLeads.length === 0 && "sr-only",
-        )}
-      >
-        Showing {visibleLeads.length} of {leads.length} leads.
-      </p>
     </div>
   );
 }

@@ -1,0 +1,28 @@
+import type { ReactNode } from "react";
+
+export default function PanelPageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sky">
+          {eyebrow}
+        </p>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+          {title}
+        </h1>
+        <p className="mt-2 text-sm text-body">{description}</p>
+      </div>
+      {actions}
+    </div>
+  );
+}

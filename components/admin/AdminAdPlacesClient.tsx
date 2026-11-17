@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import FilterBar from "@/components/ui/FilterBar";
 import type {
   AdCity,
   AdPlace,
@@ -21,6 +22,19 @@ import type {
 } from "@/lib/ads";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useFilters } from "@/lib/useFilters";
+
+type PlaceFilters = {
+  search: string;
+  city: string;
+};
+
+function createInitialFilters(cities: AdCity[]): PlaceFilters {
+  return {
+    search: "",
+    city: cities[0]?.id ?? "",
+  };
+}
 
 type Notice = {
   type: "success" | "error";
@@ -129,13 +143,15 @@ export default function AdminAdPlacesClient({
   loadError: string | null;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const initialFilters = useMemo(
+    () => createInitialFilters(initialCities),
+    [initialCities],
+  );
+  const { filters, set, clear } = useFilters(initialFilters);
   const [cities, setCities] = useState<AdCity[]>(initialCities);
   const [places, setPlaces] = useState<AdPlace[]>(initialPlaces);
   const [propertyTypes, setPropertyTypes] =
     useState<AdPropertyType[]>(initialPropertyTypes);
-  const [selectedCityId, setSelectedCityId] = useState(
-    initialCities[0]?.id ?? "",
-  );
   const [cityDraft, setCityDraft] = useState<CityDraft>({
     name: "",
     state: "",
@@ -165,23 +181,32 @@ export default function AdminAdPlacesClient({
     [cities],
   );
   const activeCityId = useMemo(() => {
-    if (
-      selectedCityId &&
-      cities.some((city) => city.id === selectedCityId)
-    ) {
-      return selectedCityId;
+    if (filters.city && cities.some((city) => city.id === filters.city)) {
+      return filters.city;
     }
 
     return sortedCities[0]?.id ?? "";
-  }, [cities, selectedCityId, sortedCities]);
+  }, [cities, filters.city, sortedCities]);
 
-  const visiblePlaces = useMemo(
+  const cityPlaces = useMemo(
     () =>
       places
         .filter((place) => place.city_id === activeCityId)
         .sort(compareRows),
     [activeCityId, places],
   );
+
+  const visiblePlaces = useMemo(() => {
+    const normalizedQuery = filters.search.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return cityPlaces;
+    }
+
+    return cityPlaces.filter((place) =>
+      place.name.toLowerCase().includes(normalizedQuery),
+    );
+  }, [cityPlaces, filters.search]);
 
   const sortedTypes = useMemo(
     () => [...propertyTypes].sort(compareRows),
@@ -230,6 +255,10 @@ export default function AdminAdPlacesClient({
   }, [propertyDependencies]);
 
   const busy = pending !== null;
+
+  function handleCityFilterChange(value: string) {
+    set("city", value || activeCityId);
+  }
 
   async function handleAddCity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -283,7 +312,7 @@ export default function AdminAdPlacesClient({
     setCities((current) =>
       current.map((city) => (city.id === tempId ? saved : city)),
     );
-    setSelectedCityId(saved.id);
+    set("city", saved.id);
     setNotice({ type: "success", message: `Added ${saved.name}.` });
   }
 
@@ -402,8 +431,8 @@ export default function AdminAdPlacesClient({
 
     const previousCities = cities;
     const previousPlaces = places;
-    const previousSelectedId = selectedCityId;
-    const nextSelectedId =
+    const previousCityFilter = filters.city;
+    const nextCityFilter =
       cities.find((item) => item.id !== city.id)?.id ?? "";
 
     setCities((current) => current.filter((item) => item.id !== city.id));
@@ -412,7 +441,7 @@ export default function AdminAdPlacesClient({
     );
 
     if (activeCityId === city.id) {
-      setSelectedCityId(nextSelectedId);
+      set("city", nextCityFilter);
     }
 
     setPending(pendingKey("city-delete", city.id));
@@ -428,7 +457,7 @@ export default function AdminAdPlacesClient({
     if (error) {
       setCities(previousCities);
       setPlaces(previousPlaces);
-      setSelectedCityId(previousSelectedId);
+      set("city", previousCityFilter);
       setNotice({ type: "error", message: error.message });
       return;
     }
@@ -459,7 +488,7 @@ export default function AdminAdPlacesClient({
       return;
     }
 
-    let sort = nextSort(visiblePlaces);
+    let sort = nextSort(cityPlaces);
 
     if (sortValue) {
       const parsed = Number(sortValue);
@@ -1039,30 +1068,31 @@ export default function AdminAdPlacesClient({
         </div>
 
         <div className="mt-5">
-          <label
-            htmlFor="place-city"
-            className="mb-1 block text-xs text-muted"
-          >
-            City
-          </label>
-          <select
-            id="place-city"
-            value={activeCityId}
-            onChange={(event) => setSelectedCityId(event.target.value)}
-            disabled={sortedCities.length === 0}
-            className={inputClass}
-          >
-            {sortedCities.length === 0 ? (
-              <option value="">No cities available</option>
-            ) : null}
-            {sortedCities.map((city) => (
-              <option key={city.id} value={city.id}>
-                {city.name}
-                {city.state ? `, ${city.state}` : ""}
-                {city.is_active ? "" : " (inactive)"}
-              </option>
-            ))}
-          </select>
+          <FilterBar
+            search={{
+              value: filters.search,
+              onChange: (value) => set("search", value),
+              placeholder: "Search places",
+            }}
+            selects={[
+              {
+                key: "city",
+                label: "City",
+                value: activeCityId,
+                onChange: handleCityFilterChange,
+                options: sortedCities.map((city) => ({
+                  value: city.id,
+                  label: `${city.name}${
+                    city.state ? `, ${city.state}` : ""
+                  }${city.is_active ? "" : " (inactive)"}`,
+                })),
+              },
+            ]}
+            toggles={[]}
+            resultCount={visiblePlaces.length}
+            total={places.length}
+            onClear={clear}
+          />
         </div>
 
         <form

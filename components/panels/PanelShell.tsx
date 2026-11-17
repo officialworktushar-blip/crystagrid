@@ -4,9 +4,17 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Building2,
+  CalendarCheck,
+  Inbox,
+  LayoutDashboard,
   LayoutGrid,
   LogOut,
+  MapPin,
   Menu,
+  Monitor,
+  Package,
+  Tags,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -14,11 +22,32 @@ import { homeForRole, ROLE_LABELS, type Role } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
+type NavIcon =
+  | "overview"
+  | "places"
+  | "properties"
+  | "packages"
+  | "pricing"
+  | "bookings"
+  | "leads"
+  | "screens";
+
 type NavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: NavIcon;
 };
+
+const NAV_ICONS = {
+  overview: LayoutDashboard,
+  places: MapPin,
+  properties: Building2,
+  packages: Package,
+  pricing: Tags,
+  bookings: CalendarCheck,
+  leads: Inbox,
+  screens: Monitor,
+} satisfies Record<NavIcon, LucideIcon>;
 
 const SWITCH_PANELS: { href: string; label: string }[] = [
   { href: "/admin", label: "Admin" },
@@ -145,7 +174,7 @@ export default function PanelShell({
               const isActive =
                 pathname === item.href ||
                 pathname.startsWith(`${item.href}/`);
-              const Icon = item.icon;
+              const Icon = NAV_ICONS[item.icon];
 
               return (
                 <Link

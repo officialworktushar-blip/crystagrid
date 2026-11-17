@@ -1,3 +1,5 @@
+import type { BookingItemType } from "@/lib/ads";
+
 export const ADMIN_BOOKING_STATUSES = [
   "pending",
   "confirmed",
@@ -13,12 +15,16 @@ export const BOOKING_FILTER_STATUSES = [
 
 export interface AdBookingItem {
   id: string;
+  type: BookingItemType | null;
+  propertyId: string | null;
+  packageId: string | null;
   name: string;
   detail: string | null;
   quantity: number;
   rate: number | null;
   rateUnit: string | null;
   amount: number | null;
+  playlistId: string | null;
 }
 
 export interface AdBooking {
@@ -41,7 +47,22 @@ export interface AdBooking {
   status: string;
   adminNotes: string;
   createdAt: string | null;
+  playlistId: string | null;
+  hasContent: boolean;
   items: AdBookingItem[];
+}
+
+export interface AdBookingScreen {
+  screen_id: string;
+  screen_name: string | null;
+  online: boolean;
+  last_seen: string | null;
+  property_id: string | null;
+  property_name: string | null;
+  place_name: string | null;
+  block: string | null;
+  spot: string | null;
+  shop_name: string | null;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -95,6 +116,35 @@ function pickNumber(row: UnknownRecord, keys: string[]): number | null {
         return parsed;
       }
     }
+  }
+
+  return null;
+}
+
+function normalizeItemType(
+  value: string | null,
+  row: UnknownRecord,
+): BookingItemType | null {
+  const normalized = value?.toLowerCase();
+
+  if (normalized === "package" || normalized === "packages") {
+    return "package";
+  }
+
+  if (
+    normalized === "property" ||
+    normalized === "properties" ||
+    normalized === "placement"
+  ) {
+    return "property";
+  }
+
+  if (pickString(row, ["package_id", "package_ref"])) {
+    return "package";
+  }
+
+  if (pickString(row, ["property_id", "property_ref"])) {
+    return "property";
   }
 
   return null;
@@ -160,11 +210,23 @@ function normalizeItem(value: unknown, index: number): AdBookingItem {
     ]) ??
     pickString(row, ["description", "placement", "place_name"]) ??
     "Booking item";
+  const packageId =
+    pickString(row, ["package_id", "package_ref"]) ??
+    pickRelationName(row, ["package", "ad_package"], ["id"]);
+  const propertyId =
+    pickString(row, ["property_id", "property_ref"]) ??
+    pickRelationName(row, ["property", "ad_property"], ["id"]);
 
   return {
     id:
       pickString(row, ["id", "item_id", "uuid"]) ??
       `booking-item-${index}`,
+    type: normalizeItemType(
+      pickString(row, ["item_type", "type", "kind", "inventory_type"]),
+      row,
+    ),
+    propertyId,
+    packageId,
     name,
     detail:
       pickString(row, [
@@ -194,6 +256,11 @@ function normalizeItem(value: unknown, index: number): AdBookingItem {
       "total",
       "subtotal",
       "price_total",
+    ]),
+    playlistId: pickString(row, [
+      "playlist_id",
+      "content_playlist_id",
+      "creative_playlist_id",
     ]),
   };
 }
@@ -329,6 +396,15 @@ export function normalizeAdBooking(value: unknown): AdBooking | null {
   const status =
     pickString(row, ["status", "booking_status", "state"])?.toLowerCase() ??
     "pending";
+  const playlistId =
+    pickString(row, [
+      "playlist_id",
+      "content_playlist_id",
+      "creative_playlist_id",
+    ]) ??
+    pickRelationName(row, ["playlist", "content_playlist"], ["id"]);
+  const hasContent =
+    Boolean(playlistId) || items.some((item) => Boolean(item.playlistId));
 
   return {
     id,
@@ -418,6 +494,8 @@ export function normalizeAdBooking(value: unknown): AdBooking | null {
         "booking_date",
         "inserted_at",
       ]) ?? null,
+    playlistId,
+    hasContent,
     items,
   };
 }
@@ -463,4 +541,54 @@ export function bookingTimestamp(booking: AdBooking): number {
   const timestamp = Date.parse(booking.createdAt);
 
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function toBookingBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value > 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    return ["1", "true", "yes", "online", "active"].includes(normalized);
+  }
+
+  return false;
+}
+
+export function normalizeAdBookingScreens(
+  value: unknown,
+): AdBookingScreen[] {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows.flatMap((entry) => {
+    const row = asRecord(entry);
+    const screenId = row
+      ? pickString(row, ["screen_id", "id", "device_id"])
+      : null;
+
+    if (!row || !screenId) {
+      return [];
+    }
+
+    return [
+      {
+        screen_id: screenId,
+        screen_name: pickString(row, ["screen_name", "name", "title"]),
+        online: toBookingBoolean(row.online ?? row.is_online ?? row.status),
+        last_seen: pickString(row, ["last_seen", "last_seen_at"]),
+        property_id: pickString(row, ["property_id"]),
+        property_name: pickString(row, ["property_name", "property"]),
+        place_name: pickString(row, ["place_name", "place", "city_name"]),
+        block: pickString(row, ["block", "block_name"]),
+        spot: pickString(row, ["spot", "spot_name"]),
+        shop_name: pickString(row, ["shop_name", "shop"]),
+      },
+    ];
+  });
 }

@@ -1,13 +1,18 @@
 "use client";
 
 import ScreensInventory from "@/components/screens/ScreensInventory";
+import type { Role } from "@/lib/roles";
 import type { StaffScreenRow } from "@/lib/staff-screens";
 
 export default function AdminScreensClient({
   rows,
+  canEdit = true,
+  role = "admin",
   loadError,
 }: {
   rows: StaffScreenRow[];
+  canEdit?: boolean;
+  role?: Role;
   loadError: string | null;
 }) {
   return (
@@ -20,7 +25,7 @@ export default function AdminScreensClient({
           Screens could not be loaded. {loadError}
         </p>
       ) : null}
-      <ScreensInventory rows={rows} canEdit role="admin" />
+      <ScreensInventory rows={rows} canEdit={canEdit} role={role} />
     </div>
   );
 }

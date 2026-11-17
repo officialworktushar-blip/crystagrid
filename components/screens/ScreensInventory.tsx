@@ -489,14 +489,16 @@ export default function ScreensInventory({
                             <Pencil aria-hidden="true" className="h-4 w-4" />
                           </button>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() => setEditingRow(row)}
-                          aria-label={`Display settings for ${row.name}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60 transition duration-200 hover:border-sky-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                        >
-                          <Settings aria-hidden="true" className="h-4 w-4" />
-                        </button>
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingRow(row)}
+                            aria-label={`Display settings for ${row.name}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60 transition duration-200 hover:border-sky-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                          >
+                            <Settings aria-hidden="true" className="h-4 w-4" />
+                          </button>
+                        ) : null}
                         {canEdit ? (
                           <button
                             type="button"
@@ -594,15 +596,17 @@ export default function ScreensInventory({
                       Edit
                     </Button>
                   ) : null}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setEditingRow(row)}
-                    className="gap-2"
-                  >
-                    <Settings aria-hidden="true" className="h-3.5 w-3.5" />
-                    Display
-                  </Button>
+                  {canEdit ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setEditingRow(row)}
+                      className="gap-2"
+                    >
+                      <Settings aria-hidden="true" className="h-3.5 w-3.5" />
+                      Display
+                    </Button>
+                  ) : null}
                   {canEdit ? (
                     <Button
                       size="sm"

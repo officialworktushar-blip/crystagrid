@@ -12,6 +12,7 @@ type SelectFilter = {
   value: string;
   options: SelectOption[];
   onChange: (value: string) => void;
+  allLabel?: string;
 };
 
 type ToggleFilter = {
@@ -79,7 +80,7 @@ export default function FilterBar({
             aria-label={item.label}
             className="max-w-[9rem] cursor-pointer bg-transparent text-sm text-white outline-none [&>option]:bg-surface-2"
           >
-            <option value="">All</option>
+            <option value="">{item.allLabel ?? "All"}</option>
             {item.options
               .filter((option) => option.value !== "")
               .map((option) => (

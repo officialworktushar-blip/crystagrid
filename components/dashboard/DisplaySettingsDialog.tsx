@@ -337,12 +337,27 @@ export default function DisplaySettingsDialog({
         .from("screens")
         .update(displayToColumns(clamped));
 
-      const filtered =
-        applyAll && siblingsCount > 1 && screen.customer_id
-          ? update.eq("customer_id", screen.customer_id)
-          : update.eq("id", screen.id);
+      const useProperty =
+        applyAll && siblingsCount > 1 && Boolean(screen.property_id);
+      const useCustomer =
+        applyAll &&
+        siblingsCount > 1 &&
+        !screen.property_id &&
+        Boolean(screen.customer_id);
+      const filterColumn = useProperty
+        ? "property_id"
+        : useCustomer
+          ? "customer_id"
+          : "id";
+      const filterValue = useProperty
+        ? screen.property_id
+        : useCustomer
+          ? screen.customer_id
+          : screen.id;
 
-      const { data, error: updateError } = await filtered.select("id");
+      const { data, error: updateError } = await update
+        .eq(filterColumn, filterValue)
+        .select("id");
 
       if (updateError) {
         setError(updateError.message);
@@ -664,7 +679,7 @@ export default function DisplaySettingsDialog({
             </Button>
           </div>
 
-          {siblingsCount > 1 ? (
+          {siblingsCount > 1 && (screen.property_id || screen.customer_id) ? (
             <label className="flex cursor-pointer items-start gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-body transition duration-200 hover:border-white/20">
               <input
                 type="checkbox"
@@ -673,7 +688,9 @@ export default function DisplaySettingsDialog({
                 className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/5 accent-sky-400"
               />
               <span>
-                Apply to all screens of this customer
+                {screen.property_id
+                  ? "Apply to all screens in this property"
+                  : "Apply to all screens of this customer"}
                 <span className="mt-0.5 block text-xs text-muted">
                   {siblingsCount} screens
                 </span>

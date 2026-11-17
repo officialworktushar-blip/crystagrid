@@ -1,71 +1,66 @@
-import AdminScreensClient, {
-  type AdminScreenRowWithCustomer,
-} from "@/components/admin/AdminScreensClient";
-import {
-  formatRelativeTime,
-  getScreenStatus,
-} from "@/lib/screens";
+import AdminScreensClient from "@/components/admin/AdminScreensClient";
+import { AddScreenButton } from "@/components/screens/AddScreenDialog";
+import type { AdCity, AdPlace, AdProperty } from "@/lib/ads";
+import { requireRole } from "@/lib/auth";
+import { normalizeStaffScreens } from "@/lib/staff-screens";
 import { createClient } from "@/lib/supabase/server";
-import type { Screen } from "@/lib/types";
 
-type ProfileRelation = {
-  full_name: string | null;
-  company_name: string | null;
-  role: string | null;
-};
-
-type RawAdminScreen = Screen & {
-  profiles?: ProfileRelation | ProfileRelation[] | null;
-};
+export const dynamic = "force-dynamic";
 
 export default async function AdminScreensPage() {
+  await requireRole(["admin"]);
+
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("screens")
-    .select("*, profiles(full_name, company_name, role)")
-    .order("last_seen", { ascending: false, nullsFirst: false });
+  const [overviewResult, citiesResult, placesResult, propertiesResult] =
+    await Promise.all([
+      supabase.rpc("staff_screens_overview"),
+      supabase
+        .from("ad_cities")
+        .select("id, name, state, is_active, sort")
+        .order("sort")
+        .order("name"),
+      supabase
+        .from("ad_places")
+        .select("id, city_id, name, is_active, sort")
+        .order("sort")
+        .order("name"),
+      supabase
+        .from("ad_properties")
+        .select("id, city_id, place_id, type_id, name, is_active, sort")
+        .order("sort")
+        .order("name"),
+    ]);
 
-  const now = Date.now();
-  const screens: AdminScreenRowWithCustomer[] = (
-    (data ?? []) as unknown as RawAdminScreen[]
-  ).map((screen) => {
-    const profile = Array.isArray(screen.profiles)
-      ? screen.profiles[0]
-      : screen.profiles;
-    const fullName = profile?.full_name?.trim() || null;
-    const companyName = profile?.company_name?.trim() || null;
-
-    return {
-      id: screen.id,
-      customer_id: screen.customer_id,
-      name: screen.name,
-      owner_name: fullName ?? companyName ?? "Unknown customer",
-      owner_company: fullName ? companyName : null,
-      owner_role: profile?.role ?? null,
-      last_seen: screen.last_seen,
-      last_seen_label: formatRelativeTime(screen.last_seen, now),
-      created_at: screen.created_at,
-      display_status: getScreenStatus(screen.status, screen.last_seen, now),
-    };
-  });
+  const loadError =
+    overviewResult.error ??
+    citiesResult.error ??
+    placesResult.error ??
+    propertiesResult.error;
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sky">
-          Admin
-        </p>
-        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-          Screens
-        </h1>
-        <p className="mt-2 text-sm text-body">
-          Review every screen across customer accounts.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sky">
+            Admin
+          </p>
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+            Screens
+          </h1>
+          <p className="mt-2 text-sm text-body">
+            Review every screen across customer accounts.
+          </p>
+        </div>
+        <AddScreenButton
+          cities={(citiesResult.data ?? []) as unknown as AdCity[]}
+          places={(placesResult.data ?? []) as unknown as AdPlace[]}
+          properties={(propertiesResult.data ?? []) as unknown as AdProperty[]}
+        />
       </div>
 
       <AdminScreensClient
-        screens={screens}
-        loadError={error?.message ?? null}
+        rows={normalizeStaffScreens(overviewResult.data)}
+        loadError={loadError?.message ?? null}
       />
     </div>
   );

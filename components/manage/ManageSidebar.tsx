@@ -35,11 +35,11 @@ export default function ManageSidebar({
 }) {
   const pathname = usePathname();
   const { sidebarOpen: open, closeSidebar: onClose } = useManageShell();
-  const basePath = `/manage/${customerId}`;
+  const basePath = `/cm/customers/${customerId}`;
 
   const navItems: NavItem[] = [
     { label: "Overview", href: basePath, icon: LayoutDashboard },
-    { label: "Screens", href: `${basePath}/screens`, icon: Monitor },
+    { label: "Screens", href: "/cm/screens", icon: Monitor },
     { label: "Media", href: `${basePath}/media`, icon: Images },
     { label: "Playlists", href: `${basePath}/playlists`, icon: ListVideo },
   ];
@@ -93,7 +93,7 @@ export default function ManageSidebar({
       >
         <div className="flex h-20 items-center justify-between border-b border-white/5 px-5">
           <Link
-            href="/manage"
+            href="/cm"
             onClick={onClose}
             className="flex min-w-0 items-center gap-2 text-base font-bold tracking-tight text-white"
           >
@@ -180,7 +180,7 @@ export default function ManageSidebar({
 
         <div className="border-t border-white/5 px-3 py-4">
           <Link
-            href="/manage"
+            href="/cm"
             onClick={onClose}
             className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-white/40 transition duration-200 hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
           >

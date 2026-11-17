@@ -79,7 +79,7 @@ export default function ManageCustomersClient({
     <div className="space-y-5">
       {isAdmin ? (
         <Link
-          href={`/manage/${currentUserId}`}
+          href={`/cm/customers/${currentUserId}`}
           className="block rounded-2xl border border-sky-400/20 bg-sky-400/5 p-4 transition hover:border-sky-400/40 hover:bg-sky-400/10"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">
@@ -158,7 +158,7 @@ export default function ManageCustomersClient({
           {visibleCustomers.map((customer) => (
             <Card key={customer.customer_id} className="p-0">
               <Link
-                href={`/manage/${customer.customer_id}`}
+                href={`/cm/customers/${customer.customer_id}`}
                 className="group block p-5 transition duration-200 hover:bg-white/[0.02] focus-visible:bg-white/[0.02] focus-visible:outline-none"
               >
                 <div className="flex items-start justify-between gap-3">

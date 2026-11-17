@@ -93,7 +93,7 @@ function RegisterForm() {
         if (profile?.role === "admin") {
           destination = "/admin";
         } else if (profile?.role === "manager") {
-          destination = "/manage";
+          destination = "/cm";
         } else if (profile?.role === "customer" && safeNext) {
           destination = safeNext;
         }

@@ -43,6 +43,9 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import ClipDialog from "@/components/dashboard/ClipDialog";
 import ContentPicker from "@/components/dashboard/ContentPicker";
+import { formatBookingStatus } from "@/lib/ad-bookings";
+import { formatBookingDate } from "@/lib/ads";
+import type { PlaylistBookingUsage } from "@/lib/cm";
 import { getMediaUrl } from "@/lib/media";
 import { notifyScreens } from "@/lib/realtime";
 import { isOnline } from "@/lib/screens";
@@ -360,6 +363,64 @@ function EmptySlotCard({
   );
 }
 
+function formatUsageDateRange(usage: PlaylistBookingUsage) {
+  const start = formatBookingDate(usage.startDate);
+  const end = formatBookingDate(usage.endDate);
+
+  if (start === "—" && end === "—") {
+    return "Dates not set";
+  }
+
+  if (start === end) {
+    return start;
+  }
+
+  return `${start} – ${end}`;
+}
+
+function BookingUsageCard({ usages }: { usages: PlaylistBookingUsage[] }) {
+  return (
+    <Card className="flex flex-col overflow-hidden p-0">
+      <div className="border-b border-white/5 px-4 py-4">
+        <h2 className="text-sm font-semibold text-white">Used in bookings:</h2>
+        <p className="mt-1 text-xs text-muted">
+          Campaigns currently referencing this playlist.
+        </p>
+      </div>
+
+      {usages.length === 0 ? (
+        <div className="px-4 py-10 text-center">
+          <p className="text-sm text-body">
+            No bookings use this playlist yet.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-white/5">
+          {usages.map((usage) => (
+            <li key={usage.id} className="px-4 py-3.5">
+              <p className="font-mono text-xs font-semibold uppercase tracking-wide text-white">
+                {usage.id.slice(0, 8)}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {formatUsageDateRange(usage)}
+              </p>
+              <span className="mt-2 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-2 py-0.5 text-[10px] font-semibold text-sky-200">
+                {formatBookingStatus(usage.status)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-auto border-t border-white/5 px-4 py-3">
+        <p className="text-xs leading-5 text-muted">
+          Attach this playlist to a booking from the Bookings tab.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
 export default function PlaylistEditor({
   playlist,
   initialItems,
@@ -369,6 +430,8 @@ export default function PlaylistEditor({
   playlists,
   canEdit,
   backHref,
+  hideScreenAssign,
+  bookingUsages = [],
 }: {
   playlist: Playlist;
   initialItems: PlaylistItem[];
@@ -378,6 +441,8 @@ export default function PlaylistEditor({
   playlists: Playlist[];
   canEdit: boolean;
   backHref: string;
+  hideScreenAssign?: boolean;
+  bookingUsages?: PlaylistBookingUsage[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<PlaylistItem[]>(initialItems);
@@ -1236,108 +1301,114 @@ export default function PlaylistEditor({
           )}
         </Card>
 
-        <Card className="flex flex-col overflow-hidden p-0">
-          <div className="border-b border-white/5 px-4 py-4">
-            <h2 className="text-sm font-semibold text-white">
-              {canEdit ? "Assign to screens" : "Assigned screens"}
-            </h2>
-            <p className="mt-1 text-xs text-muted">
-              {canEdit
-                ? "A screen can only play one playlist at a time."
-                : "Screens currently using this playlist."}
-            </p>
-          </div>
-
-          {visibleScreens.length === 0 ? (
-            <div className="px-4 py-12 text-center">
-              <p className="text-sm text-body">
+        {hideScreenAssign ? (
+          <BookingUsageCard usages={bookingUsages} />
+        ) : (
+          <Card className="flex flex-col overflow-hidden p-0">
+            <div className="border-b border-white/5 px-4 py-4">
+              <h2 className="text-sm font-semibold text-white">
+                {canEdit ? "Assign to screens" : "Assigned screens"}
+              </h2>
+              <p className="mt-1 text-xs text-muted">
                 {canEdit
-                  ? "Pair a screen before assigning a playlist."
-                  : "This playlist is not assigned to any screen."}
+                  ? "A screen can only play one playlist at a time."
+                  : "Screens currently using this playlist."}
               </p>
-              {canEdit ? (
-                <Link
-                  href="/dashboard/screens"
-                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-                >
-                  Go to screens
-                </Link>
-              ) : null}
             </div>
-          ) : (
-            <ul className="divide-y divide-white/5">
-              {visibleScreens.map((screen) => {
-                const assignment = assignmentByScreen.get(screen.id);
-                const assigned = assignment?.playlist_id === playlist.id;
-                const otherPlaylistName =
-                  assignment && !assigned
-                    ? (playlistNameById.get(assignment.playlist_id) ??
-                      "another playlist")
-                    : null;
-                const online = isOnline(screen.last_seen, now);
-                const isBusy = busyScreenId === screen.id;
 
-                return (
-                  <li key={screen.id} className="px-4 py-3.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            aria-hidden="true"
-                            className={cn(
-                              "h-2 w-2 shrink-0 rounded-full",
-                              online
-                                ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
-                                : "bg-white/30",
-                            )}
-                          />
-                          <p className="truncate text-sm font-medium text-white">
-                            {screen.name}
+            {visibleScreens.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <p className="text-sm text-body">
+                  {canEdit
+                    ? "Pair a screen before assigning a playlist."
+                    : "This playlist is not assigned to any screen."}
+                </p>
+                {canEdit ? (
+                  <Link
+                    href="/dashboard/screens"
+                    className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sky transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                  >
+                    Go to screens
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <ul className="divide-y divide-white/5">
+                {visibleScreens.map((screen) => {
+                  const assignment = assignmentByScreen.get(screen.id);
+                  const assigned = assignment?.playlist_id === playlist.id;
+                  const otherPlaylistName =
+                    assignment && !assigned
+                      ? (playlistNameById.get(assignment.playlist_id) ??
+                        "another playlist")
+                      : null;
+                  const online = isOnline(screen.last_seen, now);
+                  const isBusy = busyScreenId === screen.id;
+
+                  return (
+                    <li key={screen.id} className="px-4 py-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "h-2 w-2 shrink-0 rounded-full",
+                                online
+                                  ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                                  : "bg-white/30",
+                              )}
+                            />
+                            <p className="truncate text-sm font-medium text-white">
+                              {screen.name}
+                            </p>
+                          </div>
+                          <p className="mt-0.5 truncate text-xs text-muted">
+                            {online ? "Online" : "Offline"}
+                            {screen.location ? ` · ${screen.location}` : ""}
                           </p>
+                          {otherPlaylistName ? (
+                            <p className="mt-1.5 text-xs leading-5 text-amber-300/90">
+                              Currently plays {otherPlaylistName}, will be
+                              replaced
+                            </p>
+                          ) : null}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-muted">
-                          {online ? "Online" : "Offline"}
-                          {screen.location ? ` · ${screen.location}` : ""}
-                        </p>
-                        {otherPlaylistName ? (
-                          <p className="mt-1.5 text-xs leading-5 text-amber-300/90">
-                            Currently plays {otherPlaylistName}, will be
-                            replaced
-                          </p>
+
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={assigned}
+                            aria-label={`${assigned ? "Unassign" : "Assign"} playlist for ${screen.name}`}
+                            onClick={() =>
+                              void handleToggleAssignment(screen.id)
+                            }
+                            disabled={isBusy}
+                            className={cn(
+                              "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-60",
+                              assigned
+                                ? "brand-gradient border-transparent"
+                                : "border-white/10 bg-white/10",
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-all duration-200",
+                                assigned ? "left-6" : "left-1",
+                              )}
+                            />
+                          </button>
                         ) : null}
                       </div>
-
-                      {canEdit ? (
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={assigned}
-                          aria-label={`${assigned ? "Unassign" : "Assign"} playlist for ${screen.name}`}
-                          onClick={() => void handleToggleAssignment(screen.id)}
-                          disabled={isBusy}
-                          className={cn(
-                            "relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 disabled:opacity-60",
-                            assigned
-                              ? "brand-gradient border-transparent"
-                              : "border-white/10 bg-white/10",
-                          )}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={cn(
-                              "absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-all duration-200",
-                              assigned ? "left-6" : "left-1",
-                            )}
-                          />
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+        )}
       </div>
 
       {picker && canEdit ? (

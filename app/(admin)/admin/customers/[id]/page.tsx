@@ -236,7 +236,7 @@ export default async function AdminCustomerDetailPage({
 
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                href={`/manage/${customer.customer_id}`}
+                href={`/cm/customers/${customer.customer_id}`}
                 className="brand-gradient inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
               >
                 <Settings2 aria-hidden="true" className="h-4 w-4" />
@@ -248,7 +248,7 @@ export default async function AdminCustomerDetailPage({
                 size="sm"
                 className="h-10 px-4"
               >
-                <Link href={`/manage/${customer.customer_id}/screens`}>
+                <Link href={`/cm/customers/${customer.customer_id}`}>
                   Screens
                 </Link>
               </Button>
@@ -258,7 +258,7 @@ export default async function AdminCustomerDetailPage({
                 size="sm"
                 className="h-10 px-4"
               >
-                <Link href={`/manage/${customer.customer_id}/media`}>
+                <Link href={`/cm/customers/${customer.customer_id}/media`}>
                   Media
                 </Link>
               </Button>
@@ -268,7 +268,7 @@ export default async function AdminCustomerDetailPage({
                 size="sm"
                 className="h-10 px-4"
               >
-                <Link href={`/manage/${customer.customer_id}/playlists`}>
+                <Link href={`/cm/customers/${customer.customer_id}/playlists`}>
                   Playlists
                 </Link>
               </Button>

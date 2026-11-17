@@ -34,7 +34,7 @@ export default function ManageTopbar({
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const isCustomerRoute = /^\/manage\/[^/]+/.test(pathname);
+  const isCustomerRoute = /^\/cm\/customers\/[^/]+/.test(pathname);
   const isAdmin = role === "admin";
 
   async function handleLogout() {

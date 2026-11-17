@@ -15,6 +15,7 @@ import {
   Monitor,
   Package,
   Tags,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 type NavIcon =
   | "overview"
+  | "customers"
   | "places"
   | "properties"
   | "packages"
@@ -40,6 +42,7 @@ type NavItem = {
 
 const NAV_ICONS = {
   overview: LayoutDashboard,
+  customers: Users,
   places: MapPin,
   properties: Building2,
   packages: Package,

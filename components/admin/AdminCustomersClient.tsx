@@ -309,12 +309,12 @@ export default function AdminCustomersClient({
                       <td className="px-5 py-3.5">
                         <div className="relative z-10 flex flex-col items-end gap-1.5">
                           <Button asChild size="sm" className="h-8 px-3 text-xs">
-                            <Link href={`/manage/${customer.customer_id}`}>Manage</Link>
+                            <Link href={`/cm/customers/${customer.customer_id}`}>Manage</Link>
                           </Button>
                           <div className="flex items-center gap-2 text-xs">
-                            <Link href={`/manage/${customer.customer_id}/screens`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Screens</Link>
-                            <Link href={`/manage/${customer.customer_id}/media`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Media</Link>
-                            <Link href={`/manage/${customer.customer_id}/playlists`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Playlists</Link>
+                            <Link href={`/cm/customers/${customer.customer_id}`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Screens</Link>
+                            <Link href={`/cm/customers/${customer.customer_id}/media`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Media</Link>
+                            <Link href={`/cm/customers/${customer.customer_id}/playlists`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Playlists</Link>
                           </div>
                         </div>
                       </td>

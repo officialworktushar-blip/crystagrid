@@ -150,7 +150,7 @@ export default function EditScreenDialog({
 
     if (currentProperty) {
       setCityId(currentProperty.city_id);
-      setPlaceId(currentProperty.place_id);
+      setPlaceId(currentProperty.place_id ?? "");
     }
   }, [propertiesData, screen.property_id]);
 

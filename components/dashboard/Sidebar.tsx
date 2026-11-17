@@ -24,18 +24,30 @@ type NavItem = {
   icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
+const primaryNavItems: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "My Plans", href: "/dashboard/plans", icon: CalendarCheck },
+  { label: "Where my ads run", href: "/dashboard/screens", icon: Monitor },
   { label: "Book Ads", href: "/book", icon: Megaphone },
-  { label: "My Screens", href: "/dashboard/screens", icon: Monitor },
+];
+
+const contentNavItems: NavItem[] = [
   { label: "Media", href: "/dashboard/media", icon: Images },
   { label: "Playlists", href: "/dashboard/playlists", icon: ListVideo },
 ];
 
+function isActivePath(pathname: string, href: string): boolean {
+  if (href === "/dashboard") {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function Sidebar({
   open,
   onClose,
+  role,
 }: {
   open: boolean;
   onClose: () => void;
@@ -70,6 +82,37 @@ export default function Sidebar({
       document.body.style.overflow = originalOverflow;
     };
   }, [open]);
+
+  const renderNavItem = (item: NavItem) => {
+    const isActive = isActivePath(pathname, item.href);
+    const Icon = item.icon;
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onClose}
+        aria-current={isActive ? "page" : undefined}
+        className={cn(
+          "group flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
+          isActive
+            ? "brand-gradient text-white shadow-brand"
+            : "text-white/55 hover:bg-white/[0.05] hover:text-white",
+        )}
+      >
+        <Icon
+          aria-hidden="true"
+          className={cn(
+            "h-5 w-5 transition duration-200",
+            isActive
+              ? "text-white"
+              : "text-white/40 group-hover:text-white/80",
+          )}
+        />
+        {item.label}
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -122,45 +165,19 @@ export default function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-5" aria-label="Dashboard">
-          {navItems.map((item) => {
-            const isActive =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
-            const Icon = item.icon;
+          {primaryNavItems.map(renderNavItem)}
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                aria-current={isActive ? "page" : undefined}
-                className={cn(
-                  "group flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60",
-                  isActive
-                    ? "brand-gradient text-white shadow-brand"
-                    : "text-white/55 hover:bg-white/[0.05] hover:text-white",
-                )}
-              >
-                <Icon
-                  aria-hidden="true"
-                  className={cn(
-                    "h-5 w-5 transition duration-200",
-                    isActive
-                      ? "text-white"
-                      : "text-white/40 group-hover:text-white/80",
-                  )}
-                />
-                {item.label}
-              </Link>
-            );
-          })}
+          <p className="px-4 pb-1 pt-5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30">
+            Content
+          </p>
+
+          {contentNavItems.map(renderNavItem)}
         </nav>
 
         <div className="border-t border-white/5 px-3 py-4">
           <Link
             href="/"
+            onClick={onClose}
             className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-white/40 transition duration-200 hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
           >
             <ArrowLeft className="h-5 w-5" />

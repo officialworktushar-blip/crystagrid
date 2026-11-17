@@ -19,6 +19,7 @@ import {
   Info,
   Loader2,
   MapPin,
+  Monitor,
   Package,
   Plus,
   Sparkles,
@@ -34,13 +35,17 @@ import {
   formatBookingDate,
   formatINR,
   formatReach,
+  normalizeAdPackageStats,
+  normalizeAdPropertyStats,
   normalizeBookingQuote,
   normalizeSavedBookingResult,
   todayIST,
   type AdCity,
   type AdPackage,
   type AdPackageProperty,
+  type AdPackageStats,
   type AdProperty,
+  type AdPropertyStats,
   type AdSettings,
   type BookingItemRef,
   type BookingQuote,
@@ -354,6 +359,25 @@ function percentLabel(value: number): string {
   return `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
 }
 
+function packageScreensCount(
+  packageId: string,
+  included: AdProperty[],
+  packageStatsById: Map<string, AdPackageStats>,
+  propertyStatsById: Map<string, AdPropertyStats>,
+): number {
+  const stats = packageStatsById.get(packageId);
+
+  if (stats) {
+    return stats.screens_count;
+  }
+
+  return included.reduce(
+    (total, property) =>
+      total + (propertyStatsById.get(property.id)?.screens_count ?? 0),
+    0,
+  );
+}
+
 function SummaryRow({
   label,
   value,
@@ -385,6 +409,8 @@ export default function BookingPlanClient() {
   const quoteRequest = useRef(0);
   const [draft, setDraft] = useState<BookingDraft | null>(null);
   const [inventory, setInventory] = useState<PlanInventory | null>(null);
+  const [propertyStats, setPropertyStats] = useState<AdPropertyStats[]>([]);
+  const [packageStats, setPackageStats] = useState<AdPackageStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -407,6 +433,8 @@ export default function BookingPlanClient() {
         packagesResult,
         propertiesResult,
         packagePropertiesResult,
+        propertyStatsResult,
+        packageStatsResult,
         settingsResult,
         userResult,
       ] = await Promise.all([
@@ -433,6 +461,12 @@ export default function BookingPlanClient() {
           .from("ad_package_properties")
           .select("package_id, property_id"),
         supabase
+          .from("ad_property_stats")
+          .select("property_id, screens_count, online_count"),
+        supabase
+          .from("ad_package_stats")
+          .select("package_id, properties_count, screens_count, online_count"),
+        supabase
           .from("ad_settings")
           .select(
             "id, online_discount_pct, gst_pct, platinum_multiplier, max_total_discount_pct",
@@ -445,6 +479,9 @@ export default function BookingPlanClient() {
       if (cancelled) {
         return;
       }
+
+      setPropertyStats(normalizeAdPropertyStats(propertyStatsResult.data));
+      setPackageStats(normalizeAdPackageStats(packageStatsResult.data));
 
       const nextInventory: PlanInventory = {
         cities: (citiesResult.data ?? []) as AdCity[],
@@ -634,6 +671,14 @@ export default function BookingPlanClient() {
   const propertyById = useMemo(
     () => new Map(properties.map((item) => [item.id, item])),
     [properties],
+  );
+  const propertyStatsById = useMemo(
+    () => new Map(propertyStats.map((stat) => [stat.property_id, stat])),
+    [propertyStats],
+  );
+  const packageStatsById = useMemo(
+    () => new Map(packageStats.map((stat) => [stat.package_id, stat])),
+    [packageStats],
   );
   const packagePropertyIds = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -1082,6 +1127,17 @@ export default function BookingPlanClient() {
                     source?.monthly_reach ??
                     0;
                   const amount = quoteItem?.amount ?? 0;
+                  const screensCount =
+                    item.type === "package"
+                      ? packageScreensCount(
+                          item.id,
+                          included,
+                          packageStatsById,
+                          propertyStatsById,
+                        )
+                      : (propertyStatsById.get(item.id)?.screens_count ??
+                        propertyById.get(item.id)?.screens_count ??
+                        0);
 
                   return (
                     <div
@@ -1116,6 +1172,19 @@ export default function BookingPlanClient() {
                                 : "properties"}
                             </span>
                             <span>{formatReach(reach)} monthly reach</span>
+                            {screensCount > 0 ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Monitor
+                                  aria-hidden="true"
+                                  className="h-3 w-3"
+                                />
+                                {screensCount} screens
+                              </span>
+                            ) : (
+                              <span className="text-[#94a3b8]">
+                                Screens coming soon
+                              </span>
+                            )}
                           </div>
                           <div className="mt-3 flex flex-wrap items-end justify-between gap-2">
                             <div>
@@ -1160,19 +1229,34 @@ export default function BookingPlanClient() {
                             />
                           </summary>
                           <ul className="mt-2 space-y-1.5">
-                            {included.map((property) => (
-                              <li
-                                key={property.id}
-                                className="flex items-center justify-between gap-3 text-xs text-[#64748b]"
-                              >
-                                <span className="truncate">
-                                  {property.name}
-                                </span>
-                                <span className="shrink-0 font-semibold text-[#94a3b8]">
-                                  {formatReach(property.monthly_reach)}
-                                </span>
-                              </li>
-                            ))}
+                            {included.map((property) => {
+                              const includedScreensCount =
+                                propertyStatsById.get(property.id)
+                                  ?.screens_count ?? 0;
+
+                              return (
+                                <li
+                                  key={property.id}
+                                  className="flex items-center justify-between gap-3 text-xs text-[#64748b]"
+                                >
+                                  <span className="truncate">
+                                    {property.name}
+                                  </span>
+                                  <span className="flex shrink-0 items-center gap-3 font-semibold text-[#94a3b8]">
+                                    {includedScreensCount > 0 ? (
+                                      <span>
+                                        {includedScreensCount} screens
+                                      </span>
+                                    ) : (
+                                      <span>Screens coming soon</span>
+                                    )}
+                                    <span>
+                                      {formatReach(property.monthly_reach)}
+                                    </span>
+                                  </span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         </details>
                       ) : null}

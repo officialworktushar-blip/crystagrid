@@ -21,6 +21,7 @@ import {
   LayoutList,
   Loader2,
   MapPin,
+  Monitor,
   Package,
   Plus,
   Search,
@@ -37,12 +38,16 @@ import {
   formatINR,
   formatReach,
   getAdImageUrl,
+  normalizeAdPackageStats,
+  normalizeAdPropertyStats,
   todayIST,
   type AdCity,
   type AdPackage,
   type AdPackageProperty,
+  type AdPackageStats,
   type AdPlace,
   type AdProperty,
+  type AdPropertyStats,
   type AdPropertyType,
   type AdRateUnit,
   type AdSettings,
@@ -183,9 +188,11 @@ function EmptyImage({ className }: { className?: string }) {
 function PackageMosaic({
   properties,
   discountPct,
+  propertyStatsById,
 }: {
   properties: AdProperty[];
   discountPct: number;
+  propertyStatsById: Map<string, AdPropertyStats>;
 }) {
   const visible = properties.slice(0, 3);
 
@@ -201,6 +208,8 @@ function PackageMosaic({
     <div className="grid h-48 grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl bg-[#e2e8f0]">
       {visible.map((property, index) => {
         const imageUrl = getAdImageUrl(property.image_path);
+        const screensCount =
+          propertyStatsById.get(property.id)?.screens_count ?? 0;
 
         return (
           <div
@@ -228,6 +237,15 @@ function PackageMosaic({
                 {formatINR(discountedRate(property.rate, discountPct))}{" "}
                 {unitLabel(property.rate_unit)}
               </p>
+              {screensCount > 0 ? (
+                <p className="text-[10px] text-white/75">
+                  {screensCount} screens
+                </p>
+              ) : (
+                <p className="text-[10px] text-[#94a3b8]">
+                  Screens coming soon
+                </p>
+              )}
             </div>
           </div>
         );
@@ -275,6 +293,8 @@ export default function BookWizard() {
   const [draft, setDraft] = useState<BookingDraft>(() => emptyBookingDraft());
   const [ready, setReady] = useState(false);
   const [data, setData] = useState<InventoryData | null>(null);
+  const [propertyStats, setPropertyStats] = useState<AdPropertyStats[]>([]);
+  const [packageStats, setPackageStats] = useState<AdPackageStats[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [citySearch, setCitySearch] = useState("");
   const [inventoryTab, setInventoryTab] = useState<InventoryTab>("packages");
@@ -304,6 +324,8 @@ export default function BookWizard() {
         propertiesResult,
         packagesResult,
         packagePropertiesResult,
+        propertyStatsResult,
+        packageStatsResult,
         settingsResult,
       ] = await Promise.all([
         supabase
@@ -343,6 +365,12 @@ export default function BookWizard() {
           .from("ad_package_properties")
           .select("package_id, property_id"),
         supabase
+          .from("ad_property_stats")
+          .select("property_id, screens_count, online_count"),
+        supabase
+          .from("ad_package_stats")
+          .select("package_id, properties_count, screens_count, online_count"),
+        supabase
           .from("ad_settings")
           .select(
             "id, online_discount_pct, gst_pct, platinum_multiplier, max_total_discount_pct",
@@ -354,6 +382,9 @@ export default function BookWizard() {
       if (cancelled) {
         return;
       }
+
+      setPropertyStats(normalizeAdPropertyStats(propertyStatsResult.data));
+      setPackageStats(normalizeAdPackageStats(packageStatsResult.data));
 
       const cities = (citiesResult.data ?? []) as AdCity[];
       const nextData: InventoryData = {
@@ -465,6 +496,14 @@ export default function BookWizard() {
   const packageById = useMemo(
     () => new Map(packages.map((item) => [item.id, item])),
     [packages],
+  );
+  const propertyStatsById = useMemo(
+    () => new Map(propertyStats.map((stat) => [stat.property_id, stat])),
+    [propertyStats],
+  );
+  const packageStatsById = useMemo(
+    () => new Map(packageStats.map((stat) => [stat.package_id, stat])),
+    [packageStats],
   );
   const packagePropertyIds = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -986,6 +1025,9 @@ export default function BookWizard() {
                       );
                     const discountPct = settings.online_discount_pct;
                     const price = discountedRate(item.rate, discountPct);
+                    const packageStat = packageStatsById.get(item.id);
+                    const propertiesCount = packageStat?.properties_count ?? 0;
+                    const screensCount = packageStat?.screens_count ?? 0;
 
                     return (
                       <article
@@ -1008,6 +1050,20 @@ export default function BookWizard() {
                                   {typeById.get(item.type_id)?.name}
                                 </span>
                               ) : null}
+                              {screensCount > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[10px] font-bold text-[#475569]">
+                                  <Monitor
+                                    aria-hidden="true"
+                                    className="h-3 w-3"
+                                  />
+                                  {propertiesCount} properties · {screensCount}{" "}
+                                  screens
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[10px] font-bold text-[#94a3b8]">
+                                  Screens coming soon
+                                </span>
+                              )}
                             </div>
                             <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#64748b]">
                               {item.description ||
@@ -1063,6 +1119,7 @@ export default function BookWizard() {
                           <PackageMosaic
                             properties={included}
                             discountPct={discountPct}
+                            propertyStatsById={propertyStatsById}
                           />
                         </div>
                       </article>
@@ -1198,6 +1255,9 @@ export default function BookWizard() {
                     const checked = selectedPageProperties.has(property.id);
                     const discountPct = settings.online_discount_pct;
                     const price = discountedRate(property.rate, discountPct);
+                    const screensCount =
+                      propertyStatsById.get(property.id)?.screens_count ??
+                      property.screens_count;
                     const disabled = Boolean(includedIn) || selected;
 
                     return (
@@ -1253,6 +1313,19 @@ export default function BookWizard() {
                             <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0891b2]">
                               {formatReach(property.monthly_reach)} reach
                             </span>
+                            {screensCount > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[10px] font-bold text-[#475569]">
+                                <Monitor
+                                  aria-hidden="true"
+                                  className="h-3 w-3"
+                                />
+                                {screensCount} screens
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-[#94a3b8]">
+                                Screens coming soon
+                              </span>
+                            )}
                           </div>
                           <h3 className="mt-2 truncate text-sm font-extrabold text-[#0f172a]">
                             {property.name}

@@ -1,46 +1,14 @@
 import { redirect } from "next/navigation";
-import ScreensClient, {
-  type ScreenContentItem,
-  type ScreenContentMap,
-} from "@/components/dashboard/ScreensClient";
-import type {
-  MediaType,
-  Playlist,
-  Screen,
-  ScreenPlaylist,
-} from "@/lib/types";
+import CustomerScreensView, {
+  type CustomerBookedScreens,
+} from "@/components/dashboard/CustomerScreensView";
+import {
+  normalizeAdBookings,
+  normalizeAdBookingScreens,
+} from "@/lib/ad-bookings";
+import { groupCmBookingScreens, type CmBooking } from "@/lib/cm";
 import { createClient } from "@/lib/supabase/server";
-
-type ContentMediaRow = {
-  id: string;
-  name: string;
-  type: MediaType;
-  file_path: string;
-  duration: number | null;
-};
-
-type ContentItemRow = {
-  id: string;
-  position: number;
-  duration: number | null;
-  clip_start: number | null;
-  media: ContentMediaRow | ContentMediaRow[] | null;
-};
-
-type ContentPlaylistRow = {
-  id: string;
-  name: string;
-  playlist_items: ContentItemRow[] | null;
-};
-
-type AssignmentContentRow = {
-  id: string;
-  screen_id: string;
-  playlist_id: string;
-  is_active: boolean | null;
-  created_at: string;
-  playlists: ContentPlaylistRow | ContentPlaylistRow[] | null;
-};
+import type { Screen } from "@/lib/types";
 
 export default async function ScreensPage() {
   const supabase = await createClient();
@@ -52,149 +20,57 @@ export default async function ScreensPage() {
     redirect("/login");
   }
 
-  const customerId = user.id;
-  const canEdit = false;
+  const bookingsResult = await supabase
+    .from("ad_bookings")
+    .select("*, ad_booking_items(*)")
+    .eq("customer_id", user.id)
+    .in("status", ["pending", "confirmed", "running"])
+    .order("start_date", { ascending: true })
+    .order("created_at", { ascending: false });
 
-  const [screensResult, playlistsResult] = await Promise.all([
-    supabase
-      .from("screens")
-      .select(
-        "id, customer_id, name, status, location, last_seen, created_at, display_fit, display_rotation, display_flip_h, display_flip_v, display_width, display_height, display_left, display_top",
-      )
-      .eq("customer_id", customerId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("playlists")
-      .select("id, customer_id, name, created_at, updated_at")
-      .eq("customer_id", customerId)
-      .order("created_at", { ascending: false }),
-  ]);
+  const bookings: CmBooking[] = normalizeAdBookings(bookingsResult.data).map(
+    (booking) => ({ ...booking, customerId: user.id }),
+  );
 
-  const screens = (screensResult.data ?? []) as Screen[];
-  const playlists = (playlistsResult.data ?? []) as Playlist[];
-  const screenIds = screens.map((screen) => screen.id);
+  const screenResults = await Promise.all(
+    bookings.map((booking) =>
+      supabase.rpc("booking_screens", { p_booking: booking.id }),
+    ),
+  );
 
-  let screenPlaylists: ScreenPlaylist[] = [];
-  let contentByScreen: ScreenContentMap = {};
-  let assignmentError: string | null = null;
+  let loadError = bookingsResult.error?.message ?? null;
 
-  if (screenIds.length > 0) {
-    const { data, error } = await supabase
-      .from("screen_playlists")
-      .select(
-        `
-          id,
-          screen_id,
-          playlist_id,
-          is_active,
-          created_at,
-          playlists (
-            id,
-            name,
-            playlist_items (
-              id,
-              position,
-              duration,
-              clip_start,
-              media (
-                id,
-                name,
-                type,
-                file_path,
-                duration
-              )
-            )
-          )
-        `,
-      )
-      .in("screen_id", screenIds);
+  const bookedScreens: CustomerBookedScreens[] = bookings.map(
+    (booking, index) => {
+      const screenResult = screenResults[index];
+      const rpcError = screenResult?.error?.message ?? null;
 
-    const activeRows = ((data ?? []) as unknown as AssignmentContentRow[]).filter(
-      (assignment) => assignment.is_active !== false,
-    );
+      loadError = loadError ?? rpcError;
 
-    screenPlaylists = activeRows.map((assignment) => ({
-      id: assignment.id,
-      screen_id: assignment.screen_id,
-      playlist_id: assignment.playlist_id,
-      is_active: true,
-      created_at: assignment.created_at,
-    }));
+      return {
+        booking,
+        groups: groupCmBookingScreens(
+          normalizeAdBookingScreens(screenResult?.data),
+        ),
+      };
+    },
+  );
 
-    contentByScreen = activeRows.reduce<ScreenContentMap>(
-      (result, assignment) => {
-        const playlist = Array.isArray(assignment.playlists)
-          ? (assignment.playlists[0] ?? null)
-          : assignment.playlists;
-        const items = [...(playlist?.playlist_items ?? [])].sort(
-          (a, b) => a.position - b.position,
-        );
-        const content: ScreenContentItem[] = [];
+  const legacyResult = await supabase
+    .from("screens")
+    .select("id, customer_id, name, status, location, last_seen, created_at")
+    .eq("customer_id", user.id)
+    .order("created_at", { ascending: false });
 
-        for (const item of items) {
-          const media = Array.isArray(item.media)
-            ? (item.media[0] ?? null)
-            : item.media;
+  loadError = loadError ?? legacyResult.error?.message ?? null;
 
-          if (!media) {
-            continue;
-          }
-
-          content.push({
-            id: item.id,
-            name: media.name,
-            type: media.type,
-            file_path: media.file_path,
-            duration:
-              item.duration ??
-              (media.type === "video"
-                ? Math.min(
-                    10,
-                    media.duration && media.duration > 0 ? media.duration : 10,
-                  )
-                : 10),
-            clip_start: item.clip_start ?? 0,
-            mediaDuration: media.duration,
-            position: item.position,
-          });
-        }
-
-        result[assignment.screen_id] = content;
-        return result;
-      },
-      {},
-    );
-
-    assignmentError = error?.message ?? null;
-  }
+  const legacyScreens = (legacyResult.data ?? []) as Screen[];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sky">
-          Screens
-        </p>
-        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-          My Screens
-        </h1>
-        <p className="mt-2 text-sm text-body">
-          See where your screens are and what is playing on them.
-        </p>
-      </div>
-
-      <ScreensClient
-        screens={screens}
-        playlists={playlists}
-        screenPlaylists={screenPlaylists}
-        contentByScreen={contentByScreen}
-        customerId={customerId}
-        canEdit={canEdit}
-        loadError={
-          screensResult.error?.message ??
-          playlistsResult.error?.message ??
-          assignmentError
-        }
-      />
-    </div>
+    <CustomerScreensView
+      bookedScreens={bookedScreens}
+      legacyScreens={legacyScreens}
+      loadError={loadError}
+    />
   );
 }

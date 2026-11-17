@@ -36,7 +36,7 @@ export default async function MediaPage() {
           Media library
         </h1>
         <p className="mt-2 text-sm text-body">
-          Upload and manage the images and videos for your screens.
+          Browse images and videos prepared for your campaigns.
         </p>
       </div>
 

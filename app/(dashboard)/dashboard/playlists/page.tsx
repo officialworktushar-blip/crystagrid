@@ -98,7 +98,7 @@ export default async function PlaylistsPage() {
           Your playlists
         </h1>
         <p className="mt-2 text-sm text-body">
-          Build playlists from your media and assign them to any screen.
+          Browse playlists prepared for your campaigns.
         </p>
       </div>
 

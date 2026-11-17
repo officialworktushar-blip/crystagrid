@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import {
   AlertCircle,
-  ChevronDown,
-  Loader2,
+  ArrowUpRight,
   MapPin,
   Megaphone,
   Package,
-  Trash2,
-  XCircle,
 } from "lucide-react";
 import Card from "@/components/ui/Card";
 import {
@@ -20,7 +15,6 @@ import {
   type AdBooking,
 } from "@/lib/ad-bookings";
 import { formatBookingDate, formatINR } from "@/lib/ads";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -31,8 +25,6 @@ const STATUS_STYLES: Record<string, string> = {
   completed: "border-slate-400/20 bg-slate-400/10 text-slate-300",
   cancelled: "border-red-400/20 bg-red-400/10 text-red-200",
 };
-
-type BookingAction = "delete" | "cancel";
 
 function dateRange(booking: AdBooking): string {
   const start = booking.startDate
@@ -93,48 +85,6 @@ export default function MyPlansClient({
   bookings: AdBooking[];
   loadError: string | null;
 }) {
-  const router = useRouter();
-  const [pendingAction, setPendingAction] = useState<{
-    id: string;
-    action: BookingAction;
-  } | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const runAction = async (booking: AdBooking, action: BookingAction) => {
-    const confirmed = window.confirm(
-      action === "delete"
-        ? "Delete this draft? This cannot be undone."
-        : "Cancel this booking request? This cannot be undone.",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setPendingAction({ id: booking.id, action });
-    setActionError(null);
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc("cancel_booking", {
-        p_id: booking.id,
-      });
-
-      if (error) {
-        setActionError(
-          error.message || "We couldn't update this booking. Try again.",
-        );
-        return;
-      }
-
-      router.refresh();
-    } catch {
-      setActionError("We couldn't update this booking. Try again.");
-    } finally {
-      setPendingAction(null);
-    }
-  };
-
   if (loadError) {
     return (
       <Card
@@ -175,194 +125,123 @@ export default function MyPlansClient({
 
   return (
     <div className="space-y-4">
-      {actionError ? (
-        <div
-          role="alert"
-          className="flex items-start gap-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3"
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
-          <p className="text-sm text-red-200">{actionError}</p>
-        </div>
-      ) : null}
-
       {bookings.map((booking) => {
         const status = booking.status.toLowerCase();
-        const isDraft = status === "draft";
-        const isPending = status === "pending";
-        const isViewOnly = !isDraft && !isPending;
-        const busy = pendingAction !== null;
-        const deleting =
-          pendingAction?.id === booking.id &&
-          pendingAction.action === "delete";
-        const cancelling =
-          pendingAction?.id === booking.id &&
-          pendingAction.action === "cancel";
         const createdLabel = booking.createdAt
           ? `Created ${formatBookingDate(booking.createdAt)}`
           : "Created date pending";
 
         return (
-          <Card
+          <Link
             key={booking.id}
-            className="overflow-hidden p-0 hover:border-white/15 hover:shadow-none"
+            href={`/dashboard/plans/${booking.id}`}
+            aria-label={`View booking ${formatBookingId(booking.id)} details`}
+            className="block rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
           >
-            <div className="border-b border-white/5 px-5 py-5 sm:px-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">
-                    Booking {formatBookingId(booking.id)}
-                  </p>
-                  <h2 className="mt-1 inline-flex items-center gap-2 text-lg font-bold text-white">
-                    <MapPin className="h-4 w-4 text-sky-300" />
-                    {booking.city || "City pending"}
-                  </h2>
-                  <p className="mt-1 text-xs text-white/35">{createdLabel}</p>
+            <Card className="h-full overflow-hidden p-0 hover:border-sky-500/40 hover:shadow-card">
+              <div className="border-b border-white/5 px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">
+                      Booking {formatBookingId(booking.id)}
+                    </p>
+                    <h2 className="mt-1 inline-flex items-center gap-2 text-lg font-bold text-white">
+                      <MapPin className="h-4 w-4 text-sky-300" />
+                      {booking.city || "City pending"}
+                    </h2>
+                    <p className="mt-1 text-xs text-white/35">{createdLabel}</p>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize",
+                      STATUS_STYLES[status] ??
+                        "border-white/10 bg-white/5 text-white/60",
+                    )}
+                  >
+                    {formatBookingStatus(booking.status)}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    "inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize",
-                    STATUS_STYLES[status] ??
-                      "border-white/10 bg-white/5 text-white/60",
-                  )}
-                >
-                  {formatBookingStatus(booking.status)}
-                </span>
+
+                <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <BookingStat
+                    label="Campaign dates"
+                    value={dateRange(booking)}
+                    hint={dayLabel(booking.days)}
+                  />
+                  <BookingStat
+                    label="Tier"
+                    value={
+                      booking.tier
+                        ? formatBookingStatus(booking.tier)
+                        : "Gold"
+                    }
+                  />
+                  <BookingStat
+                    label="Items"
+                    value={`${booking.itemCount} ${
+                      booking.itemCount === 1 ? "item" : "items"
+                    }`}
+                    hint={`${booking.items.length} line ${
+                      booking.items.length === 1 ? "item" : "items"
+                    }`}
+                  />
+                  <BookingStat
+                    label="Total"
+                    value={formatINR(booking.total)}
+                    highlight
+                  />
+                </dl>
               </div>
 
-              <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <BookingStat
-                  label="Campaign dates"
-                  value={dateRange(booking)}
-                  hint={dayLabel(booking.days)}
-                />
-                <BookingStat
-                  label="Tier"
-                  value={
-                    booking.tier
-                      ? formatBookingStatus(booking.tier)
-                      : "Gold"
-                  }
-                />
-                <BookingStat
-                  label="Items"
-                  value={`${booking.itemCount} ${
-                    booking.itemCount === 1 ? "item" : "items"
-                  }`}
-                  hint={`${booking.items.length} line ${
-                    booking.items.length === 1 ? "item" : "items"
-                  }`}
-                />
-                <BookingStat
-                  label="Total"
-                  value={formatINR(booking.total)}
-                  highlight
-                />
-              </dl>
-            </div>
-
-            <div className="space-y-4 px-5 py-5 sm:px-6">
-              <details className="group rounded-2xl border border-white/5 bg-white/[0.02]">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-white/70 transition hover:text-white [&::-webkit-details-marker]:hidden">
-                  <span className="inline-flex items-center gap-2">
+              <div className="space-y-4 px-5 py-5 sm:px-6">
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02]">
+                  <p className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-white/70">
                     <Package className="h-4 w-4 text-white/40" />
                     Campaign items ({booking.items.length})
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-white/35 transition group-open:rotate-180" />
-                </summary>
+                  </p>
 
-                {booking.items.length > 0 ? (
-                  <ul className="divide-y divide-white/5 border-t border-white/5">
-                    {booking.items.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-start justify-between gap-4 px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-white/80">
-                            {item.name}
-                          </p>
-                          {item.detail ? (
-                            <p className="mt-0.5 truncate text-xs text-white/35">
-                              {item.detail}
+                  {booking.items.length > 0 ? (
+                    <ul className="divide-y divide-white/5 border-t border-white/5">
+                      {booking.items.map((item) => (
+                        <li
+                          key={item.id}
+                          className="flex items-start justify-between gap-4 px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-white/80">
+                              {item.name}
                             </p>
-                          ) : null}
-                          <p className="mt-1 text-[11px] text-white/35">
-                            Quantity {item.quantity}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-sm font-semibold text-white/75">
-                          {item.amount !== null
-                            ? formatINR(item.amount)
-                            : "—"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="border-t border-white/5 px-4 py-3 text-sm text-white/40">
-                    No inventory lines recorded for this booking.
-                  </p>
-                )}
-              </details>
+                            {item.detail ? (
+                              <p className="mt-0.5 truncate text-xs text-white/35">
+                                {item.detail}
+                              </p>
+                            ) : null}
+                            <p className="mt-1 text-[11px] text-white/35">
+                              Quantity {item.quantity}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-sm font-semibold text-white/75">
+                            {item.amount !== null
+                              ? formatINR(item.amount)
+                              : "—"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="border-t border-white/5 px-4 py-3 text-sm text-white/40">
+                      No inventory lines recorded for this booking.
+                    </p>
+                  )}
+                </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                {isViewOnly ? (
-                  <p className="mr-auto max-w-md text-xs leading-5 text-white/40">
-                    Contact your account manager to change this booking.
-                  </p>
-                ) : null}
-
-                {isDraft ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void runAction(booking, "delete")}
-                      disabled={busy}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-red-400/20 bg-red-400/10 px-4 text-sm font-semibold text-red-200 transition hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {deleting ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                      Delete
-                    </button>
-                    <Link
-                      href={`/book/plan?draft=${booking.id}`}
-                      onClick={(event) => {
-                        if (busy) {
-                          event.preventDefault();
-                        }
-                      }}
-                      aria-disabled={busy}
-                      className={cn(
-                        "brand-gradient inline-flex h-9 items-center justify-center rounded-full px-4 text-sm font-semibold text-white shadow-brand transition hover:brightness-110",
-                        busy && "pointer-events-none opacity-50",
-                      )}
-                    >
-                      Continue
-                    </Link>
-                  </>
-                ) : null}
-
-                {isPending ? (
-                  <button
-                    type="button"
-                    onClick={() => void runAction(booking, "cancel")}
-                    disabled={busy}
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {cancelling ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    Cancel request
-                  </button>
-                ) : null}
+                <p className="flex items-center justify-end gap-2 text-xs font-semibold text-sky-300">
+                  View booking details
+                  <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+                </p>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </Link>
         );
       })}
     </div>

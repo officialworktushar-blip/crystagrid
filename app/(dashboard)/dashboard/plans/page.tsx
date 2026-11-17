@@ -29,8 +29,7 @@ export default async function MyPlansPage() {
           My Plans
         </h1>
         <p className="mt-2 text-sm text-body">
-          Review your campaign requests, continue drafts, and track booking
-          status.
+          Review your campaign requests and track booking status in one place.
         </p>
       </div>
 

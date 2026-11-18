@@ -102,7 +102,7 @@ export async function PropertiesSection({
         .order("name", { ascending: true }),
       supabase
         .from("ad_places")
-        .select("id, city_id, name, is_active, sort")
+        .select("id, city_id, name, lat, lng, is_major, is_active, sort")
         .order("sort", { ascending: true })
         .order("name", { ascending: true }),
       supabase
@@ -169,7 +169,7 @@ export async function PackagesSection({ eyebrow = "Admin" }: { eyebrow?: string 
       .order("name", { ascending: true }),
     supabase
       .from("ad_places")
-      .select("id, city_id, name, is_active, sort")
+      .select("id, city_id, name, lat, lng, is_major, is_active, sort")
       .order("sort", { ascending: true })
       .order("name", { ascending: true }),
     supabase
@@ -177,15 +177,15 @@ export async function PackagesSection({ eyebrow = "Admin" }: { eyebrow?: string 
       .select("id, name, sort")
       .order("sort", { ascending: true })
       .order("name", { ascending: true }),
-        supabase
-          .from("ad_properties")
-          .select(
-            "id, city_id, place_id, type_id, name, description, image_path, screens_count, monthly_reach, rate, rate_unit, is_active, sort",
-          )
-          .order("sort", { ascending: true })
-          .order("name", { ascending: true }),
-      supabase
-        .from("ad_packages")
+    supabase
+      .from("ad_properties")
+      .select(
+        "id, city_id, place_id, type_id, name, description, image_path, screens_count, monthly_reach, rate, rate_unit, is_active, sort",
+      )
+      .order("sort", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("ad_packages")
       .select(
         "id, city_id, type_id, name, description, monthly_reach, rate, rate_unit, is_active, sort",
       )
@@ -336,7 +336,7 @@ export async function ScreensSection({
         .order("name"),
       supabase
         .from("ad_places")
-        .select("id, city_id, name, is_active, sort")
+        .select("id, city_id, name, lat, lng, is_major, is_active, sort")
         .order("sort")
         .order("name"),
       supabase

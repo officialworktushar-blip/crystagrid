@@ -12,6 +12,9 @@ export interface AdPlace {
   id: string;
   city_id: string;
   name: string;
+  lat: number | null;
+  lng: number | null;
+  is_major: boolean;
   is_active: boolean;
   sort: number;
 }

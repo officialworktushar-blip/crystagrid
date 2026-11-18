@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Mail, Phone } from "lucide-react";
 import ContactForm from "@/components/marketing/ContactForm";
 import Container from "@/components/ui/Container";
@@ -72,7 +73,15 @@ export default function ContactPage() {
             </div>
           </div>
 
-          <ContactForm />
+          <Suspense
+            fallback={
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-sm text-body">
+                Loading form...
+              </div>
+            }
+          >
+            <ContactForm />
+          </Suspense>
         </div>
       </Container>
     </section>

@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import { COLORS, SCREENS } from "@/lib/signage-screens";
 import { createClient } from "@/lib/supabase/client";
 
 const NAME_MAX = 100;
@@ -29,6 +31,20 @@ export default function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submittingRef = useRef(false);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const screenId = searchParams.get("screen");
+    const colorId = searchParams.get("color");
+    const screen = SCREENS.find((item) => item.id === screenId);
+    if (!screen) return;
+
+    const colour = COLORS.find((item) => item.id === colorId);
+    const colourText = colour ? ` (${colour.label})` : "";
+    const prefilled = `I am interested in the ${screen.name} screen${colourText}.`;
+
+    setMessage((current) => (current.trim() ? current : prefilled));
+  }, [searchParams]);
 
   function resetForm() {
     setName("");

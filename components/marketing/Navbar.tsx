@@ -8,16 +8,23 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
 const solutions = [
-  { href: "#digital-signage", label: "Digital Signage" },
+  { href: "/solutions/digital-signage", label: "Digital Signage" },
 ];
 
 function SolutionsMenu() {
+  const pathname = usePathname();
+  const solutionsActive = pathname.startsWith("/solutions");
+
   return (
     <div className="group relative">
       <button
         type="button"
         aria-haspopup="true"
-        className="flex items-center gap-1.5 text-lg font-medium text-white transition duration-200 hover:text-sky-400 focus-visible:text-sky-400 focus-visible:outline-none"
+        aria-current={solutionsActive ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-1.5 text-lg font-medium transition duration-200 hover:text-sky-400 focus-visible:text-sky-400 focus-visible:outline-none",
+          solutionsActive ? "text-sky-400" : "text-white",
+        )}
       >
         Solutions
         <svg
@@ -40,7 +47,10 @@ function SolutionsMenu() {
             <Link
               key={item.href}
               href={item.href}
-              className="block rounded-xl px-3 py-2 text-sm font-medium text-white/70 transition duration-200 hover:bg-white/5 hover:text-white"
+              className={cn(
+                "block rounded-xl px-3 py-2 text-sm font-medium transition duration-200 hover:bg-white/5 hover:text-white",
+                pathname === item.href ? "bg-white/5 text-sky-400" : "text-white/70",
+              )}
             >
               {item.label}
             </Link>
@@ -230,8 +240,9 @@ export default function Navbar() {
 
               <Link
                 href="#solutions"
+                aria-current={pathname.startsWith("/solutions") ? "page" : undefined}
                 onClick={() => setMobileOpen(false)}
-                className={mobileLinkClass(false)}
+                className={mobileLinkClass(pathname.startsWith("/solutions"))}
               >
                 Solutions
               </Link>

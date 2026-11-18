@@ -3,21 +3,21 @@
 import Image from "next/image";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { ABOUT_HERO, ABOUT_IMAGES } from "@/lib/about-content";
+import { ABOUT_HERO, ABOUT_HERO_MEDIA } from "@/lib/about-content";
 
 const TILE_GAP = 20;
-const TILE_WIDTH_DESKTOP = 320;
+const SMALLEST_TILE_WIDTH = 260;
 const MAX_VIEWPORT_WIDTH = 3840;
 const REPEATS = Math.max(
   2,
   Math.ceil(
-    Math.ceil((MAX_VIEWPORT_WIDTH * 2) / (TILE_WIDTH_DESKTOP + TILE_GAP)) /
-      ABOUT_IMAGES.length,
+    Math.ceil((MAX_VIEWPORT_WIDTH * 2) / (SMALLEST_TILE_WIDTH + TILE_GAP)) /
+      ABOUT_HERO_MEDIA.length,
   ),
 );
 const HALF_TILES = Array.from(
-  { length: REPEATS * ABOUT_IMAGES.length },
-  (_, index) => ABOUT_IMAGES[index % ABOUT_IMAGES.length],
+  { length: REPEATS * ABOUT_HERO_MEDIA.length },
+  (_, index) => ABOUT_HERO_MEDIA[index % ABOUT_HERO_MEDIA.length],
 );
 
 const MARQUEE_MASK = {
@@ -28,7 +28,7 @@ const MARQUEE_MASK = {
 } as const;
 
 const MARQUEE_TRANSITION = {
-  duration: 40,
+  duration: 80,
   ease: "linear" as const,
   repeat: Infinity,
 };
@@ -79,14 +79,18 @@ export default function AboutHero() {
               {HALF_TILES.map((image, index) => (
                 <div
                   key={`${isDuplicate ? "duplicate" : "original"}-${index}`}
-                  className="relative aspect-[3/4] w-[260px] shrink-0 overflow-hidden rounded-[28px] md:w-[320px]"
+                  className={`relative w-[260px] shrink-0 overflow-hidden rounded-[28px] ${
+                    image.orientation === "landscape"
+                      ? "aspect-[4/3] md:w-[400px]"
+                      : "aspect-[3/4] md:w-[320px]"
+                  }`}
                   style={{ border: "1px solid rgba(255,255,255,0.1)" }}
                 >
                   <Image
                     src={image.src}
                     alt={isDuplicate ? "" : image.alt}
                     fill
-                    sizes="(min-width: 768px) 320px, 260px"
+                    sizes="(min-width: 768px) 400px, 260px"
                     className="object-cover"
                   />
                 </div>

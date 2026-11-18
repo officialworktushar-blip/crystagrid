@@ -149,14 +149,6 @@ export default function Navbar() {
               About Us
             </Link>
 
-            <Link
-              href="#about"
-              aria-current={isActive("#about") ? "page" : undefined}
-              className={linkClass(isActive("#about"))}
-            >
-              About Us
-            </Link>
-
             <SolutionsMenu />
 
             <Link
@@ -232,15 +224,6 @@ export default function Navbar() {
                 aria-current={pathname === "/about-us" ? "page" : undefined}
                 onClick={() => setMobileOpen(false)}
                 className={mobileLinkClass(pathname === "/about-us")}
-              >
-                About Us
-              </Link>
-
-              <Link
-                href="#about"
-                aria-current={isActive("#about") ? "page" : undefined}
-                onClick={() => setMobileOpen(false)}
-                className={mobileLinkClass(isActive("#about"))}
               >
                 About Us
               </Link>

@@ -27,6 +27,39 @@ export const ABOUT_IMAGES = [
 
 // Dehradun photos can be added to this list later; keep these four sources in sync with the Venues section.
 
+export type HeroMedia = {
+  src: string;
+  alt: string;
+  orientation: "portrait" | "landscape";
+};
+
+export const ABOUT_HERO_MEDIA: HeroMedia[] = [
+  { src: ABOUT_IMAGES[0].src, alt: ABOUT_IMAGES[0].alt, orientation: "portrait" },
+  {
+    src: "/Cafe_Horizontal.webp",
+    alt: "Digital screens in cafes and restaurants",
+    orientation: "landscape",
+  },
+  { src: ABOUT_IMAGES[1].src, alt: ABOUT_IMAGES[1].alt, orientation: "portrait" },
+  {
+    src: "/Apartment_Horizontal.webp",
+    alt: "Digital screens in residential buildings",
+    orientation: "landscape",
+  },
+  { src: ABOUT_IMAGES[2].src, alt: ABOUT_IMAGES[2].alt, orientation: "portrait" },
+  {
+    src: "/Trends_Horizontal.webp",
+    alt: "Retail screens showing current trends",
+    orientation: "landscape",
+  },
+  { src: ABOUT_IMAGES[3].src, alt: ABOUT_IMAGES[3].alt, orientation: "portrait" },
+  {
+    src: "/Home_MockUp.webp",
+    alt: "Crystagrid self-serve dashboard",
+    orientation: "landscape",
+  },
+];
+
 export const VIDEO_SRC = "/about-video.mp4";
 
 export const ABOUT_HERO = {

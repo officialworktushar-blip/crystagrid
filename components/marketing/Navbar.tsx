@@ -9,8 +9,6 @@ import { cn } from "@/lib/utils";
 
 const solutions = [
   { href: "#digital-signage", label: "Digital Signage" },
-  { href: "#menu-boards", label: "Menu Boards" },
-  { href: "#corporate-displays", label: "Corporate Displays" },
 ];
 
 function SolutionsMenu() {

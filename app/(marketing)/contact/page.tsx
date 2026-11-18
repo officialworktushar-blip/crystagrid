@@ -7,7 +7,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 export const metadata: Metadata = {
   title: "Contact — Talk to Crystagrid",
   description:
-    "Talk to the Crystagrid team about digital signage, menu boards, corporate displays, and screen networks.",
+    "Talk to the Crystagrid team about digital signage and screen networks.",
 };
 
 export default function ContactPage() {

@@ -1,8 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useState } from "react";
+import {
+  motion,
+  useAnimationFrame,
+  useMotionValue,
+  useReducedMotion,
+} from "framer-motion";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ABOUT_HERO, ABOUT_HERO_MEDIA } from "@/lib/about-content";
 
 const TILE_GAP = 20;
@@ -20,6 +25,8 @@ const HALF_TILES = Array.from(
   (_, index) => ABOUT_HERO_MEDIA[index % ABOUT_HERO_MEDIA.length],
 );
 
+const MARQUEE_DURATION = 200;
+
 const MARQUEE_MASK = {
   maskImage:
     "linear-gradient(to right, transparent, #000 8%, #000 92%, transparent)",
@@ -27,19 +34,67 @@ const MARQUEE_MASK = {
     "linear-gradient(to right, transparent, #000 8%, #000 92%, transparent)",
 } as const;
 
-const MARQUEE_TRANSITION = {
-  duration: 200,
-  ease: "linear" as const,
-  repeat: Infinity,
-};
+function wrapX(value: number, half: number): number {
+  if (half <= 0) return 0;
+  return -(((-value % half) + half) % half);
+}
 
 export default function AboutHero() {
   const reducedMotion = useReducedMotion();
   const [reduce, setReduce] = useState(false);
+  const x = useMotionValue(0);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const halfWidthRef = useRef(0);
+  const draggingRef = useRef(false);
+  const lastPointerRef = useRef(0);
 
   useEffect(() => {
     setReduce(Boolean(reducedMotion));
   }, [reducedMotion]);
+
+  useEffect(() => {
+    const node = trackRef.current;
+    if (!node) return;
+
+    const measure = () => {
+      halfWidthRef.current = node.scrollWidth / 2;
+    };
+    measure();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useAnimationFrame((_, delta) => {
+    if (reduce || draggingRef.current) return;
+    const half = halfWidthRef.current;
+    if (half <= 0) return;
+    x.set(wrapX(x.get() - (delta * half) / (MARQUEE_DURATION * 1000), half));
+  });
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    draggingRef.current = true;
+    lastPointerRef.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const half = halfWidthRef.current;
+    if (half <= 0) return;
+    const dx = event.clientX - lastPointerRef.current;
+    lastPointerRef.current = event.clientX;
+    x.set(wrapX(x.get() + dx, half));
+  };
+
+  const onPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    draggingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   const revealProps = reduce
     ? {}
@@ -62,14 +117,20 @@ export default function AboutHero() {
       />
 
       <div
-        className={reduce ? "relative flex w-full justify-center overflow-hidden" : "relative w-full overflow-hidden"}
-        style={MARQUEE_MASK}
+        role="group"
+        aria-label="Drag left or right to browse the mockups"
+        className={
+          reduce
+            ? "relative flex w-full cursor-grab justify-center overflow-hidden active:cursor-grabbing"
+            : "relative w-full cursor-grab overflow-hidden active:cursor-grabbing"
+        }
+        style={{ ...MARQUEE_MASK, touchAction: "pan-y" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
       >
-        <motion.div
-          className="flex w-max"
-          animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-          transition={reduce ? undefined : MARQUEE_TRANSITION}
-        >
+        <motion.div ref={trackRef} className="flex w-max" style={{ x }}>
           {[false, true].map((isDuplicate) => (
             <div
               key={isDuplicate ? "duplicate" : "original"}
@@ -90,6 +151,7 @@ export default function AboutHero() {
                     src={image.src}
                     alt={isDuplicate ? "" : image.alt}
                     fill
+                    draggable={false}
                     sizes="(min-width: 768px) 400px, 260px"
                     className="object-cover"
                   />

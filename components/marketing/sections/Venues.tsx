@@ -7,19 +7,23 @@ import SectionHeading from "@/components/ui/SectionHeading";
 
 const venues = [
   {
-    title: "Tatvan",
+    title: "Retail Stores",
+    description: "Promote offers and new arrivals at the point of sale.",
     image: "/Tatvan_Vertical.webp",
   },
   {
-    title: "Atira",
+    title: "Offices & Lobbies",
+    description: "Keep teams and visitors informed with live updates.",
     image: "/Atira_Veritcal.webp",
   },
   {
-    title: "Tarya",
+    title: "Gyms & Salons",
+    description: "Show schedules, services, and promotions on repeat.",
     image: "/Tarya_Vertical.webp",
   },
   {
-    title: "Cafe",
+    title: "Restaurants & Cafes",
+    description: "Display menus and daily specials that stay current.",
     image: "/Cafe_Vertical.webp",
   },
 ];
@@ -55,9 +59,12 @@ export default function Venues() {
                     />
                   </div>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold tracking-tight text-white">
+                <h3 className="mt-4 text-lg font-semibold tracking-tight text-white text-center">
                   {venue.title}
                 </h3>
+                <p className="mt-2 text-sm leading-6 text-white/60 text-center">
+                  {venue.description}
+                </p>
               </div>
             ))}
           </div>

@@ -8,6 +8,7 @@ const pageLinks = [
 ];
 
 const companyLinks = [
+  { href: "/about-us", label: "About Us" },
   { href: "/login", label: "Login" },
   { href: "/register", label: "Register" },
   { href: "/contact", label: "Contact" },

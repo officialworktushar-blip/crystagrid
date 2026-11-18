@@ -11,6 +11,7 @@ import {
   projectPlaces,
   voronoiCells,
   type BBox,
+  type PlacedLabel,
   type ProjectedPoint,
 } from "@/lib/map-geo";
 
@@ -183,65 +184,87 @@ export default function DehradunMap() {
   const totalScreens = sum(places.map((p) => p.screensCount));
   const totalOnline = sum(places.map((p) => p.onlineCount));
 
-  const projection = useMemo(
-    () =>
-      projectPlaces(
-        places.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng })),
+  type MapGeometry = {
+    projection: ReturnType<typeof projectPlaces>;
+    radius: number;
+    outline: ReturnType<typeof outlinePath>;
+    cells: ReturnType<typeof voronoiCells>;
+    sitesById: Map<string, ProjectedPoint & { place: MapPlace }>;
+    labelById: Map<string, PlacedLabel>;
+  };
+
+  const geometry = useMemo<MapGeometry | null>(() => {
+    try {
+      const validPlaces = places.filter(
+        (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng),
+      );
+      if (validPlaces.length < 2) return null;
+
+      const projection = projectPlaces(
+        validPlaces.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng })),
         VIEWBOX_WIDTH,
         70,
-      ),
-    [places],
-  );
-
-  const radius = 0.11 * projection.width;
-
-  const outline = useMemo(() => {
-    if (projection.points.length < 3) {
-      // circle around sites
-      if (projection.points.length === 0) {
-        return { path: "", bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } as BBox };
+      );
+      if (projection.points.length < 2) return null;
+      if (!Number.isFinite(projection.width) || !Number.isFinite(projection.height)) {
+        return null;
       }
-      if (projection.points.length === 1) {
-        return outlinePath(projection.points, radius);
+
+      const radius = 0.11 * projection.width;
+      if (!Number.isFinite(radius)) return null;
+
+      const outline = outlinePath(projection.points, radius);
+      if (!outline.path) return null;
+      const { minX, minY, maxX, maxY } = outline.bbox;
+      if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null;
+
+      const bounds: BBox = {
+        minX: minX - 20,
+        minY: minY - 20,
+        maxX: maxX + 20,
+        maxY: maxY + 20,
+      };
+      const cells = projection.points.length >= 3
+        ? voronoiCells(projection.points, bounds)
+        : [];
+
+      const labelSites = projection.points
+        .map((pt) => {
+          const pl = validPlaces.find((p) => p.id === pt.id);
+          return pl ? { ...pt, name: pl.name, major: pl.major } : null;
+        })
+        .filter(
+          (site): site is { id: string; x: number; y: number; name: string; major: boolean } =>
+            site !== null,
+        );
+      const labels = placeLabels(labelSites, 13);
+
+      const sitesById = new Map<string, ProjectedPoint & { place: MapPlace }>();
+      for (const pt of projection.points) {
+        const pl = validPlaces.find((p) => p.id === pt.id);
+        if (pl) sitesById.set(pt.id, { ...pt, place: pl });
       }
-      // 2 points: hull of circles still fine
-      return outlinePath(projection.points, radius);
+      const labelById = new Map(labels.map((l) => [l.id, l]));
+
+      return { projection, radius, outline, cells, sitesById, labelById };
+    } catch {
+      return null;
     }
-    return outlinePath(projection.points, radius);
-  }, [projection.points, radius]);
+  }, [places]);
 
-  const cells = useMemo(() => {
-    if (projection.points.length < 3) return [];
-    const bounds: BBox = {
-      minX: outline.bbox.minX - 20,
-      minY: outline.bbox.minY - 20,
-      maxX: outline.bbox.maxX + 20,
-      maxY: outline.bbox.maxY + 20,
-    };
-    return voronoiCells(projection.points, bounds);
-  }, [projection.points, outline.bbox]);
-
-  const labels = useMemo(() => {
-    const sites = projection.points.map((pt) => {
-      const pl = places.find((p) => p.id === pt.id)!;
-      return { ...pt, name: pl.name, major: pl.major };
-    });
-    return placeLabels(sites, 13);
-  }, [projection.points, places]);
-
-  const sitesById = useMemo(() => {
-    const m = new Map<string, ProjectedPoint & { place: MapPlace }>();
-    for (const pt of projection.points) {
-      const pl = places.find((p) => p.id === pt.id);
-      if (pl) m.set(pt.id, { ...pt, place: pl });
-    }
-    return m;
-  }, [projection.points, places]);
-
-  const labelById = useMemo(() => {
-    const m = new Map(labels.map((l) => [l.id, l]));
-    return m;
-  }, [labels]);
+  const projection = geometry?.projection ?? {
+    points: [],
+    width: VIEWBOX_WIDTH,
+    height: 520,
+  };
+  const radius = geometry?.radius ?? 0;
+  const outline = geometry?.outline ?? {
+    path: "",
+    bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } as BBox,
+  };
+  const cells = geometry?.cells ?? [];
+  const sitesById = geometry?.sitesById ?? new Map<string, ProjectedPoint & { place: MapPlace }>();
+  const labelById = geometry?.labelById ?? new Map<string, PlacedLabel>();
 
   const handleCellEnter = (id: string, e: React.PointerEvent<SVGPathElement>) => {
     if (e.pointerType === "mouse") setHoveredId(id);
@@ -361,6 +384,7 @@ export default function DehradunMap() {
           </motion.div>
 
           <motion.div {...reveal(0.1)} className="order-1 lg:order-2">
+            {geometry ? (
             <div
               className="overflow-hidden rounded-[36px] border border-[#e3e9f2] bg-white p-4 sm:p-6"
               style={{ boxShadow: "0 30px 80px -30px rgba(14,165,233,0.35)" }}
@@ -399,6 +423,7 @@ export default function DehradunMap() {
                 <g clipPath="url(#dehradun-clip)">
                   {projection.points.length >= 3
                     ? cells.map((cell) => {
+                        if (!cell.path || cell.polygon.length < 3) return null;
                         const pl = sitesById.get(cell.id)?.place;
                         if (!pl) return null;
                         const isActive = activeId === cell.id;
@@ -577,6 +602,7 @@ export default function DehradunMap() {
                 </span>
               </div>
             </div>
+            ) : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
               {places.map((pl) => {
@@ -588,10 +614,7 @@ export default function DehradunMap() {
                     type="button"
                     onClick={() => toggleSelect(pl.id)}
                     onMouseEnter={() => {
-                      if (
-                        typeof window !== "undefined" &&
-                        window.matchMedia("(hover: hover)").matches
-                      ) {
+                      if (!isTouch) {
                         setHoveredId(pl.id);
                       }
                     }}

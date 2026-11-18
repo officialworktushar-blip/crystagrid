@@ -12,7 +12,7 @@ import Venues from "@/components/marketing/sections/Venues";
 import WhyCrystagrid from "@/components/marketing/sections/WhyCrystagrid";
 
 export const metadata: Metadata = {
-  title: "Crystagrid �?" Control every screen from one dashboard",
+  title: "Crystagrid | Control every screen from one dashboard",
   description:
     "Crystagrid is the digital signage cloud for uploading media, building playlists, and pushing content to every screen in real time.",
 };

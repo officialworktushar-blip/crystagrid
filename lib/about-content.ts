@@ -53,11 +53,6 @@ export const ABOUT_HERO_MEDIA: HeroMedia[] = [
     orientation: "landscape",
   },
   { src: ABOUT_IMAGES[3].src, alt: ABOUT_IMAGES[3].alt, orientation: "portrait" },
-  {
-    src: "/Home_MockUp.webp",
-    alt: "Crystagrid self-serve dashboard",
-    orientation: "landscape",
-  },
 ];
 
 export const VIDEO_SRC = "/about-video.mp4";

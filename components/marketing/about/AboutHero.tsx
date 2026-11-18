@@ -28,7 +28,7 @@ const MARQUEE_MASK = {
 } as const;
 
 const MARQUEE_TRANSITION = {
-  duration: 80,
+  duration: 200,
   ease: "linear" as const,
   repeat: Infinity,
 };
@@ -47,7 +47,7 @@ export default function AboutHero() {
         initial: { opacity: 0, y: 24 } as const,
         whileInView: { opacity: 1, y: 0 } as const,
         viewport: { once: true } as const,
-        transition: { duration: 0.6 },
+        transition: { duration: 1.5 },
       };
 
   return (

@@ -1,6 +1,10 @@
 "use client";
 
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
+import atiraVertical from "../../public/Atira_Veritcal.webp";
+import cafeVertical from "../../public/Cafe_Vertical.webp";
+import tatvanVertical from "../../public/Tatvan_Vertical.webp";
+import taryaVertical from "../../public/Tarya_Vertical.webp";
 import {
   motion,
   useAnimationFrame,
@@ -14,7 +18,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 const DEBUG = false;
 
 type ScreenCreative = {
-  image?: string;
+  image: StaticImageData;
 };
 
 type ViewportSize = {
@@ -34,7 +38,6 @@ const CENTER_Y_RATIO = 0.58;
 const ROTATE_SECONDS = 60;
 const BASE_WIDTH = 200;
 const BEZEL = 10;
-const SCREEN_ASPECT = 5 / 6;
 const EXTRA_BOTTOM_BEZEL = 4;
 
 const MOBILE_BREAKPOINT = 768;
@@ -60,7 +63,17 @@ const FAR_SLAB_COLOR = "#04070f";
 const BEZEL_BORDER_COLOR = "#1a2d63";
 const SCREEN_COLOR = "#060b18";
 
-const SCREENS: ScreenCreative[] = [{}, {}, {}, {}, {}, {}, {}];
+const HERO_IMAGES = [
+  tatvanVertical,
+  atiraVertical,
+  taryaVertical,
+  cafeVertical,
+] as const;
+
+const SCREENS: ScreenCreative[] = Array.from(
+  { length: FRAME_COUNT },
+  (_, index) => ({ image: HERO_IMAGES[index % HERO_IMAGES.length] }),
+);
 
 function hexToRgb(hex: string): [number, number, number] {
   const value = hex.replace("#", "");
@@ -169,9 +182,7 @@ type OrbitFrameProps = {
   radiusX: number;
   radiusY: number;
   frameWidth: number;
-  frameHeight: number;
   innerScreenWidth: number;
-  innerScreenHeight: number;
 };
 
 function OrbitFrame({
@@ -183,12 +194,14 @@ function OrbitFrame({
   radiusX,
   radiusY,
   frameWidth,
-  frameHeight,
   innerScreenWidth,
-  innerScreenHeight,
 }: OrbitFrameProps) {
   const frameRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  const screenAspect = screen.image.width / screen.image.height;
+  const innerScreenHeight = innerScreenWidth / screenAspect;
+  const frameHeight =
+    innerScreenHeight + 2 * BEZEL + EXTRA_BOTTOM_BEZEL;
 
   const initialState = getFrameState(
     angle.get(),
@@ -308,12 +321,14 @@ function OrbitFrame({
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
+                  objectFit: "contain",
+                  objectPosition: "center",
                   display: "block",
                   opacity: 1,
                 }}
               />
             ) : null}
+
           </div>
         </motion.div>
       </motion.div>
@@ -413,9 +428,6 @@ export default function OrbitScreens() {
     MIN_FRAME_WIDTH,
   );
   const innerScreenWidth = frameWidth - 2 * BEZEL;
-  const innerScreenHeight = innerScreenWidth / SCREEN_ASPECT;
-  const frameHeight =
-    innerScreenHeight + 2 * BEZEL + EXTRA_BOTTOM_BEZEL;
 
   return (
     <div
@@ -442,9 +454,7 @@ export default function OrbitScreens() {
               radiusX={radiusX}
               radiusY={radiusY}
               frameWidth={frameWidth}
-              frameHeight={frameHeight}
               innerScreenWidth={innerScreenWidth}
-              innerScreenHeight={innerScreenHeight}
             />
           ))
         ) : null}

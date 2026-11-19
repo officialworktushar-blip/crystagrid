@@ -43,7 +43,7 @@ export default function ManageCustomersClient({
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const myAccount = useMemo(
-    () => customers.find((c) => c.customer_id === currentUserId) ?? null,
+    () => customers.find((c) => c.id === currentUserId) ?? null,
     [customers, currentUserId],
   );
 
@@ -79,7 +79,7 @@ export default function ManageCustomersClient({
     <div className="space-y-5">
       {isAdmin ? (
         <Link
-          href={`/cm/customers/${currentUserId}`}
+          href={`/cm/customers/${myAccount?.id ?? currentUserId}`}
           className="block rounded-2xl border border-sky-400/20 bg-sky-400/5 p-4 transition hover:border-sky-400/40 hover:bg-sky-400/10"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">
@@ -155,10 +155,13 @@ export default function ManageCustomersClient({
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visibleCustomers.map((customer) => (
-            <Card key={customer.customer_id} className="p-0">
+          {visibleCustomers.map((row) => {
+            const customer = row;
+
+            return (
+            <Card key={row.id} className="p-0">
               <Link
-                href={`/cm/customers/${customer.customer_id}`}
+                href={`/cm/customers/${row.id}`}
                 className="group block p-5 transition duration-200 hover:bg-white/[0.02] focus-visible:bg-white/[0.02] focus-visible:outline-none"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -218,7 +221,8 @@ export default function ManageCustomersClient({
                 </div>
               </Link>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

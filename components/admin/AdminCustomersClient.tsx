@@ -7,6 +7,7 @@ import { ArrowUpRight, Search } from "lucide-react";
 import AdminManagerSelect from "@/components/admin/AdminManagerSelect";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import PanelSelect from "@/components/ui/PanelSelect";
 import {
   customerDisplayName,
   formatAdminDate,
@@ -27,9 +28,6 @@ const sortOptions: { value: SortKey; label: string }[] = [
   { value: "storage-desc", label: "Most storage" },
   { value: "storage-asc", label: "Least storage" },
 ];
-
-const selectClass =
-  "h-10 rounded-full border border-white/10 bg-[#050b1f] px-4 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40";
 
 function ScreensCount({
   online,
@@ -162,39 +160,33 @@ export default function AdminCustomersClient({
             <label htmlFor="customer-manager-filter" className="text-xs text-muted">
               Manager
             </label>
-            <select
+            <PanelSelect
               id="customer-manager-filter"
               value={managerFilter}
-              onChange={(event) => setManagerFilter(event.target.value)}
-              className={selectClass}
-            >
-              <option value="all">All customers</option>
-              <option value="unassigned">Unassigned only</option>
-              {managers.map((manager) => (
-                <option key={manager.id} value={manager.id}>
-                  {managerDisplayName(manager)}
-                  {manager.role === "admin" ? " (Admin)" : ""}
-                </option>
-              ))}
-            </select>
+              onChange={setManagerFilter}
+              label="Manager"
+              options={[
+                { value: "all", label: "All customers" },
+                { value: "unassigned", label: "Unassigned only" },
+                ...managers.map((manager) => ({
+                  value: manager.id,
+                  label: `${managerDisplayName(manager)}${manager.role === "admin" ? " (Admin)" : ""}`,
+                })),
+              ]}
+            />
           </div>
 
           <div className="flex items-center gap-2">
             <label htmlFor="customer-sort" className="text-xs text-muted">
               Sort
             </label>
-            <select
+            <PanelSelect
               id="customer-sort"
               value={sort}
-              onChange={(event) => setSort(event.target.value as SortKey)}
-              className={selectClass}
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setSort(value as SortKey)}
+              label="Sort"
+              options={sortOptions}
+            />
           </div>
         </div>
       </div>
@@ -251,25 +243,26 @@ export default function AdminCustomersClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {visibleCustomers.map((customer) => {
-                  const isMine = currentAdminId && customer.manager_id === currentAdminId;
+                {visibleCustomers.map((row) => {
+                  const customer = row;
+                  const isMine = currentAdminId && row.manager_id === currentAdminId;
                   return (
-                    <tr key={customer.customer_id} className="relative transition duration-200 hover:bg-white/[0.03]">
+                    <tr key={row.id} className="relative transition duration-200 hover:bg-white/[0.03]">
                       <td className="max-w-[14rem] px-5 py-3.5">
                         <Link
-                          href={`/admin/customers/${customer.customer_id}`}
+                          href={`/admin/customers/${row.id}`}
                           className="block truncate rounded-sm font-semibold text-white after:absolute after:inset-0 after:content-[''] focus-visible:text-brand-sky focus-visible:outline-none"
                         >
                           {customerDisplayName(customer)}
                         </Link>
                       </td>
-                      <td className="max-w-[12rem] px-4 py-3.5 text-white/70"><span className="block truncate">{customer.company_name || "—"}</span></td>
-                      <td className="max-w-[15rem] px-4 py-3.5 text-white/70"><span className="block truncate">{customer.email || "—"}</span></td>
-                      <td className="px-4 py-3.5 text-white/70">{customer.phone || "—"}</td>
+                      <td className="max-w-[12rem] px-4 py-3.5 text-white/70"><span className="block truncate">{customer.company_name || "-"}</span></td>
+                      <td className="max-w-[15rem] px-4 py-3.5 text-white/70"><span className="block truncate">{customer.email || "-"}</span></td>
+                      <td className="px-4 py-3.5 text-white/70">{customer.phone || "-"}</td>
                       <td className="relative z-10 min-w-[13rem] px-4 py-3.5">
                         <div className="space-y-2">
                           <AdminManagerSelect
-                            customerId={customer.customer_id}
+                            customerId={row.id}
                             managerId={customer.manager_id}
                             managers={managers}
                             className="w-52"
@@ -282,8 +275,8 @@ export default function AdminCustomersClient({
                             ) : currentAdminId ? (
                               <button
                                 type="button"
-                                disabled={busyId === customer.customer_id}
-                                onClick={() => void assignToMe(customer.customer_id)}
+                                disabled={busyId === row.id}
+                                onClick={() => void assignToMe(row.id)}
                                 className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] font-semibold text-sky-200 transition hover:bg-sky-400/20 disabled:opacity-60"
                               >
                                 Assign to me
@@ -292,8 +285,8 @@ export default function AdminCustomersClient({
                             {customer.manager_id ? (
                               <button
                                 type="button"
-                                disabled={busyId === customer.customer_id}
-                                onClick={() => void unassign(customer.customer_id)}
+                                disabled={busyId === row.id}
+                                onClick={() => void unassign(row.id)}
                                 className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold text-white/70 transition hover:bg-white/10 disabled:opacity-60"
                               >
                                 Unassign
@@ -309,12 +302,12 @@ export default function AdminCustomersClient({
                       <td className="px-5 py-3.5">
                         <div className="relative z-10 flex flex-col items-end gap-1.5">
                           <Button asChild size="sm" className="h-8 px-3 text-xs">
-                            <Link href={`/cm/customers/${customer.customer_id}`}>Manage</Link>
+                            <Link href={`/cm/customers/${row.id}`}>Manage</Link>
                           </Button>
                           <div className="flex items-center gap-2 text-xs">
-                            <Link href={`/cm/customers/${customer.customer_id}`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Screens</Link>
-                            <Link href={`/cm/customers/${customer.customer_id}/media`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Media</Link>
-                            <Link href={`/cm/customers/${customer.customer_id}/playlists`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Playlists</Link>
+                            <Link href={`/cm/customers/${row.id}`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Screens</Link>
+                            <Link href={`/cm/customers/${row.id}/media`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Media</Link>
+                            <Link href={`/cm/customers/${row.id}/playlists`} className="rounded-sm text-white/50 transition duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60">Playlists</Link>
                           </div>
                         </div>
                       </td>
@@ -325,12 +318,13 @@ export default function AdminCustomersClient({
             </table>
           </div>
           <div className="divide-y divide-white/5 lg:hidden">
-            {visibleCustomers.map((customer) => {
-              const isMine = currentAdminId && customer.manager_id === currentAdminId;
+            {visibleCustomers.map((row) => {
+              const customer = row;
+              const isMine = currentAdminId && row.manager_id === currentAdminId;
               return (
-                <div key={customer.customer_id} className="p-4">
+                <div key={row.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <Link href={`/admin/customers/${customer.customer_id}`} className="min-w-0 flex-1 rounded-sm transition duration-200 hover:text-brand-sky focus-visible:text-brand-sky focus-visible:outline-none">
+                    <Link href={`/admin/customers/${row.id}`} className="min-w-0 flex-1 rounded-sm transition duration-200 hover:text-brand-sky focus-visible:text-brand-sky focus-visible:outline-none">
                       <p className="truncate text-sm font-semibold text-white">{customerDisplayName(customer)}</p>
                       <p className="mt-0.5 truncate text-xs text-body">{customer.company_name || "No company"}</p>
                       <p className="mt-0.5 truncate text-xs text-muted">{customer.email || "No email"}</p>
@@ -340,18 +334,18 @@ export default function AdminCustomersClient({
                     {isMine ? (
                       <span className="inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-200">Assigned to you</span>
                     ) : currentAdminId ? (
-                      <button type="button" disabled={busyId === customer.customer_id} onClick={() => void assignToMe(customer.customer_id)} className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] font-semibold text-sky-200 disabled:opacity-60">Assign to me</button>
+                      <button type="button" disabled={busyId === row.id} onClick={() => void assignToMe(row.id)} className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] font-semibold text-sky-200 disabled:opacity-60">Assign to me</button>
                     ) : null}
                     {customer.manager_id ? (
-                      <button type="button" disabled={busyId === customer.customer_id} onClick={() => void unassign(customer.customer_id)} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold text-white/70 disabled:opacity-60">Unassign</button>
+                      <button type="button" disabled={busyId === row.id} onClick={() => void unassign(row.id)} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold text-white/70 disabled:opacity-60">Unassign</button>
                     ) : null}
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                    <div><dt className="text-muted">Phone</dt><dd className="mt-0.5 text-white/70">{customer.phone || "—"}</dd></div>
+                    <div><dt className="text-muted">Phone</dt><dd className="mt-0.5 text-white/70">{customer.phone || "-"}</dd></div>
                     <div><dt className="text-muted">Screens</dt><dd className="mt-0.5"><ScreensCount online={customer.online_screens} total={customer.total_screens} /></dd></div>
                   </dl>
                   <div className="mt-4">
-                    <AdminManagerSelect customerId={customer.customer_id} managerId={customer.manager_id} managers={managers} className="w-full sm:max-w-xs" />
+                    <AdminManagerSelect customerId={row.id} managerId={customer.manager_id} managers={managers} className="w-full sm:max-w-xs" />
                   </div>
                 </div>
               );

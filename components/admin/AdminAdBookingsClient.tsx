@@ -18,6 +18,7 @@ import {
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FilterBar from "@/components/ui/FilterBar";
+import PanelSelect from "@/components/ui/PanelSelect";
 import type {
   AdBooking,
   AdBookingItem,
@@ -103,8 +104,8 @@ const statusStyles: Record<
   },
   completed: {
     badge:
-      "border-violet-400/20 bg-violet-400/10 text-violet-300",
-    dot: "bg-violet-400",
+      "border-blue-400/20 bg-blue-400/10 text-blue-300",
+    dot: "bg-blue-400",
   },
   cancelled: {
     badge: "border-red-400/20 bg-red-400/10 text-red-300",
@@ -868,7 +869,7 @@ export default function AdminAdBookingsClient({
             aria-modal="true"
             aria-labelledby="booking-drawer-title"
             aria-busy={saving}
-            className="absolute inset-y-0 right-0 z-10 flex w-full max-w-xl flex-col border-l border-white/10 bg-[#050b1f] shadow-2xl"
+            className="absolute inset-y-0 right-0 z-10 flex w-full max-w-xl flex-col border-l border-white/10 bg-surface shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4 border-b border-white/5 p-5 sm:p-6">
               <div className="min-w-0">
@@ -1122,21 +1123,18 @@ export default function AdminAdBookingsClient({
                   >
                     Status
                   </label>
-                  <select
+                  <PanelSelect
                     id="booking-status"
                     value={draftStatus}
-                    onChange={(event) =>
-                      setDraftStatus(event.target.value)
-                    }
+                    onChange={setDraftStatus}
                     disabled={saving}
-                    className={inputClass}
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {formatBookingStatus(status)}
-                      </option>
-                    ))}
-                  </select>
+                    label="Status"
+                    className="w-full"
+                    options={statusOptions.map((status) => ({
+                      value: status,
+                      label: formatBookingStatus(status),
+                    }))}
+                  />
                 </div>
 
                 <div>

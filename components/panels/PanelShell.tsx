@@ -120,7 +120,7 @@ export default function PanelShell({
   }
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="panel-theme min-h-screen bg-background text-white">
       <button
         type="button"
         aria-label="Close navigation"

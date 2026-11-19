@@ -52,7 +52,7 @@ export default function ManageShell({
     <ManageShellContext.Provider
       value={{ sidebarOpen, openSidebar, closeSidebar }}
     >
-      <div className="min-h-screen bg-background text-white">
+      <div className="panel-theme min-h-screen bg-background text-white">
         <ManageTopbar
           user={user}
           role={role}

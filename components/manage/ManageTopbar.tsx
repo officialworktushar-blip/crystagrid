@@ -49,7 +49,7 @@ export default function ManageTopbar({
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 border-b border-white/5 bg-[#050b1f]/80 backdrop-blur-xl",
+        "sticky top-0 z-30 border-b border-white/5 bg-surface/80 backdrop-blur-xl",
         isCustomerRoute && "lg:pl-64",
       )}
     >

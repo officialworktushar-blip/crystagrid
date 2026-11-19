@@ -34,6 +34,7 @@ import {
 import DisplaySettingsDialog from "@/components/dashboard/DisplaySettingsDialog";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
+import PanelSelect from "@/components/ui/PanelSelect";
 import { displaySummary, screenToDisplay } from "@/lib/display";
 import { getMediaUrl } from "@/lib/media";
 import { notifyChannel, notifyScreens } from "@/lib/realtime";
@@ -842,28 +843,22 @@ export default function ScreensClient({
                   </div>
 
                   {canEdit ? (
-                    <select
-                      aria-label={`Playlist for ${screen.name}`}
+                    <PanelSelect
+                      ariaLabel={`Playlist for ${screen.name}`}
                       value={assignment?.playlist_id ?? ""}
-                      onChange={(event) =>
-                        void handlePlaylistChange(screen, event.target.value)
+                      onChange={(value) =>
+                        void handlePlaylistChange(screen, value)
                       }
                       disabled={savingPlaylistId === screen.id}
-                      className="h-9 w-full rounded-full border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:opacity-60 sm:w-auto sm:max-w-[240px]"
-                    >
-                      <option value="" className="bg-surface text-white">
-                        No playlist
-                      </option>
-                      {playlists.map((playlist) => (
-                        <option
-                          key={playlist.id}
-                          value={playlist.id}
-                          className="bg-surface text-white"
-                        >
-                          {playlist.name}
-                        </option>
-                      ))}
-                    </select>
+                      className="h-9 w-full sm:w-auto sm:max-w-[240px]"
+                      options={[
+                        { value: "", label: "No playlist" },
+                        ...playlists.map((playlist) => ({
+                          value: playlist.id,
+                          label: playlist.name,
+                        })),
+                      ]}
+                    />
                   ) : null}
                 </div>
 

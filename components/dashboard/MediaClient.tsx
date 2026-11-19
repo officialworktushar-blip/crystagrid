@@ -778,7 +778,7 @@ export default function MediaClient({
                           "absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] backdrop-blur",
                           item.type === "image"
                             ? "border-sky-400/25 bg-sky-400/15 text-sky-200"
-                            : "border-violet-400/25 bg-violet-400/15 text-violet-200",
+                            : "border-blue-400/25 bg-blue-400/15 text-blue-200",
                         )}
                       >
                         {item.type === "image" ? (

@@ -70,7 +70,7 @@ const TEST_PATTERN_SVG = `
     <linearGradient id="pattern-gradient" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0ea5e9" />
       <stop offset="0.55" stop-color="#1d6fff" />
-      <stop offset="1" stop-color="#071a44" />
+      <stop offset="1" stop-color="#0f1b3a" />
     </linearGradient>
   </defs>
   <rect width="1600" height="900" fill="url(#pattern-gradient)" />
@@ -97,7 +97,7 @@ function TestPattern({
 }) {
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,#0ea5e9_0%,#1d6fff_55%,#071a44_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,#0ea5e9_0%,#1d6fff_55%,#0f1b3a_100%)]" />
       <div
         aria-hidden="true"
         className="absolute inset-0 opacity-20"

@@ -23,6 +23,7 @@ import {
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FilterBar from "@/components/ui/FilterBar";
+import PanelSelect from "@/components/ui/PanelSelect";
 import type {
   AdCity,
   AdPackage,
@@ -1537,24 +1538,24 @@ export default function AdminAdPackagesClient({
                   >
                     City <span className="text-red-300">*</span>
                   </label>
-                  <select
+                  <PanelSelect
                     id="package-city"
                     value={form.city_id}
-                    onChange={(event) =>
-                      handleFormCityChange(event.target.value)
-                    }
-                    className={inputClass}
-                  >
-                    {sortedCities.length === 0 ? (
-                      <option value="">No cities available</option>
-                    ) : null}
-                    {sortedCities.map((city) => (
-                      <option key={city.id} value={city.id}>
-                        {city.name}
-                        {city.state ? `, ${city.state}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleFormCityChange}
+                    label="City"
+                    className="w-full"
+                    options={[
+                      ...(sortedCities.length === 0
+                        ? [{ value: "", label: "No cities available" }]
+                        : []),
+                      ...sortedCities.map((city) => ({
+                        value: city.id,
+                        label: city.state
+                          ? `${city.name}, ${city.state}`
+                          : city.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -1564,24 +1565,22 @@ export default function AdminAdPackagesClient({
                   >
                     Type tag
                   </label>
-                  <select
+                  <PanelSelect
                     id="package-type"
                     value={form.type_id}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        type_id: event.target.value,
-                      }))
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, type_id: value }))
                     }
-                    className={inputClass}
-                  >
-                    <option value="">No type</option>
-                    {sortedTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
+                    label="Type tag"
+                    className="w-full"
+                    options={[
+                      { value: "", label: "No type" },
+                      ...sortedTypes.map((type) => ({
+                        value: type.id,
+                        label: type.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1638,21 +1637,22 @@ export default function AdminAdPackagesClient({
                       >
                         Unit
                       </label>
-                      <select
+                      <PanelSelect
                         id="package-rate-unit"
                         value={form.rate_unit}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setForm((current) => ({
                             ...current,
-                            rate_unit: event.target
-                              .value as AdRateUnit,
+                            rate_unit: value as AdRateUnit,
                           }))
                         }
-                        className={inputClass}
-                      >
-                        <option value="week">Per week</option>
-                        <option value="day">Per day</option>
-                      </select>
+                        label="Unit"
+                        className="w-full"
+                        options={[
+                          { value: "week", label: "Per week" },
+                          { value: "day", label: "Per day" },
+                        ]}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1772,37 +1772,33 @@ export default function AdminAdPackagesClient({
                             )}
                           />
                         </div>
-                        <select
+                        <PanelSelect
                           value={propertyTypeFilter}
-                          onChange={(event) =>
-                            setPropertyTypeFilter(event.target.value)
-                          }
-                          aria-label="Filter included properties by type"
-                          className={cn(inputClass, "h-9 text-xs")}
-                        >
-                          <option value="all">All types</option>
-                          {sortedTypes.map((type) => (
-                            <option key={type.id} value={type.id}>
-                              {type.name}
-                            </option>
-                          ))}
-                        </select>
-                        <select
+                          onChange={setPropertyTypeFilter}
+                          ariaLabel="Filter included properties by type"
+                          className="h-9 text-xs"
+                          options={[
+                            { value: "all", label: "All types" },
+                            ...sortedTypes.map((type) => ({
+                              value: type.id,
+                              label: type.name,
+                            })),
+                          ]}
+                        />
+                        <PanelSelect
                           value={propertyPlaceFilter}
-                          onChange={(event) =>
-                            setPropertyPlaceFilter(event.target.value)
-                          }
-                          aria-label="Filter included properties by place"
-                          className={cn(inputClass, "h-9 text-xs")}
+                          onChange={setPropertyPlaceFilter}
+                          ariaLabel="Filter included properties by place"
                           disabled={formPlaceOptions.length === 0}
-                        >
-                          <option value="all">All places</option>
-                          {formPlaceOptions.map((place) => (
-                            <option key={place.id} value={place.id}>
-                              {place.name}
-                            </option>
-                          ))}
-                        </select>
+                          className="h-9 text-xs"
+                          options={[
+                            { value: "all", label: "All places" },
+                            ...formPlaceOptions.map((place) => ({
+                              value: place.id,
+                              label: place.name,
+                            })),
+                          ]}
+                        />
                       </div>
                     </div>
 

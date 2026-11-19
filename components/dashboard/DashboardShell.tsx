@@ -24,7 +24,7 @@ export default function DashboardShell({
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="panel-theme min-h-screen bg-background text-white">
       <Sidebar
         open={sidebarOpen}
         onClose={closeSidebar}

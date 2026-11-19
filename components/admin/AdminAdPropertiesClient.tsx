@@ -25,6 +25,7 @@ import {
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import FilterBar from "@/components/ui/FilterBar";
+import PanelSelect from "@/components/ui/PanelSelect";
 import type {
   AdCity,
   AdPlace,
@@ -1541,24 +1542,24 @@ export default function AdminAdPropertiesClient({
                   >
                     City <span className="text-red-300">*</span>
                   </label>
-                  <select
+                  <PanelSelect
                     id="property-city"
                     value={form.city_id}
-                    onChange={(event) =>
-                      handleFormCityChange(event.target.value)
-                    }
-                    className={inputClass}
-                  >
-                    {sortedCities.length === 0 ? (
-                      <option value="">No cities available</option>
-                    ) : null}
-                    {sortedCities.map((city) => (
-                      <option key={city.id} value={city.id}>
-                        {city.name}
-                        {city.state ? `, ${city.state}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleFormCityChange}
+                    label="City"
+                    className="w-full"
+                    options={[
+                      ...(sortedCities.length === 0
+                        ? [{ value: "", label: "No cities available" }]
+                        : []),
+                      ...sortedCities.map((city) => ({
+                        value: city.id,
+                        label: city.state
+                          ? `${city.name}, ${city.state}`
+                          : city.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -1568,25 +1569,23 @@ export default function AdminAdPropertiesClient({
                   >
                     Place
                   </label>
-                  <select
+                  <PanelSelect
                     id="property-place"
                     value={form.place_id}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        place_id: event.target.value,
-                      }))
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, place_id: value }))
                     }
                     disabled={formPlaceOptions.length === 0}
-                    className={inputClass}
-                  >
-                    <option value="">No place</option>
-                    {formPlaceOptions.map((place) => (
-                      <option key={place.id} value={place.id}>
-                        {place.name}
-                      </option>
-                    ))}
-                  </select>
+                    label="Place"
+                    className="w-full"
+                    options={[
+                      { value: "", label: "No place" },
+                      ...formPlaceOptions.map((place) => ({
+                        value: place.id,
+                        label: place.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div>
@@ -1596,24 +1595,22 @@ export default function AdminAdPropertiesClient({
                   >
                     Type
                   </label>
-                  <select
+                  <PanelSelect
                     id="property-type"
                     value={form.type_id}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        type_id: event.target.value,
-                      }))
+                    onChange={(value) =>
+                      setForm((current) => ({ ...current, type_id: value }))
                     }
-                    className={inputClass}
-                  >
-                    <option value="">No type</option>
-                    {sortedTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
+                    label="Type"
+                    className="w-full"
+                    options={[
+                      { value: "", label: "No type" },
+                      ...sortedTypes.map((type) => ({
+                        value: type.id,
+                        label: type.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1699,20 +1696,22 @@ export default function AdminAdPropertiesClient({
                       >
                         Unit
                       </label>
-                      <select
+                      <PanelSelect
                         id="property-rate-unit"
                         value={form.rate_unit}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setForm((current) => ({
                             ...current,
-                            rate_unit: event.target.value as AdRateUnit,
+                            rate_unit: value as AdRateUnit,
                           }))
                         }
-                        className={inputClass}
-                      >
-                        <option value="week">Per week</option>
-                        <option value="day">Per day</option>
-                      </select>
+                        label="Unit"
+                        className="w-full"
+                        options={[
+                          { value: "week", label: "Per week" },
+                          { value: "day", label: "Per day" },
+                        ]}
+                      />
                     </div>
                   </div>
                 </div>

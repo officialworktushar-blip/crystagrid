@@ -13,6 +13,7 @@ import {
   Scissors,
 } from "lucide-react";
 import Card from "@/components/ui/Card";
+import PanelSelect from "@/components/ui/PanelSelect";
 import { formatINR } from "@/lib/ads";
 import {
   formatBookingId,
@@ -75,8 +76,8 @@ const statusStyles: Record<string, { badge: string; dot: string }> = {
     dot: "bg-emerald-400",
   },
   completed: {
-    badge: "border-violet-400/20 bg-violet-400/10 text-violet-300",
-    dot: "bg-violet-400",
+    badge: "border-blue-400/20 bg-blue-400/10 text-blue-300",
+    dot: "bg-blue-400",
   },
   cancelled: {
     badge: "border-red-400/20 bg-red-400/10 text-red-300",
@@ -110,7 +111,7 @@ function DateStateChip({ booking }: { booking: CmBooking }) {
         ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
         : state.tone === "ended"
           ? "border-white/10 bg-white/5 text-white/50"
-          : "border-violet-400/20 bg-violet-400/10 text-violet-300";
+          : "border-blue-400/20 bg-blue-400/10 text-blue-300";
 
   return (
     <span
@@ -684,21 +685,22 @@ export default function CmCustomerBookingsClient({
                   >
                     Playlist
                   </label>
-                  <select
+                  <PanelSelect
                     id={`booking-playlist-${booking.id}`}
                     value={booking.playlistId ?? ""}
-                    onChange={(event) =>
-                      void handlePlaylistChange(booking, event.target.value)
+                    onChange={(value) =>
+                      void handlePlaylistChange(booking, value)
                     }
-                    className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 sm:max-w-sm"
-                  >
-                    <option value="">No content</option>
-                    {playlists.map((playlist) => (
-                      <option key={playlist.id} value={playlist.id}>
-                        {playlist.name}
-                      </option>
-                    ))}
-                  </select>
+                    label="Playlist"
+                    className="w-full sm:max-w-sm"
+                    options={[
+                      { value: "", label: "No content" },
+                      ...playlists.map((playlist) => ({
+                        value: playlist.id,
+                        label: playlist.name,
+                      })),
+                    ]}
+                  />
                   <span aria-live="polite" className="text-xs">
                     {saveState.status === "saving" ? (
                       <span className="inline-flex items-center gap-1.5 text-body">

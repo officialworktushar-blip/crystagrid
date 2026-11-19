@@ -163,7 +163,7 @@ export default async function CmOverviewPage() {
             </span>
           }
           icon={Monitor}
-          accent="text-violet-300"
+          accent="text-brand-blue"
         />
       </div>
 

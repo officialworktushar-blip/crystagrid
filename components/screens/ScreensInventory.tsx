@@ -6,6 +6,7 @@ import { Loader2, MapPin, Pencil, Settings, Trash2 } from "lucide-react";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
 import FilterBar from "@/components/ui/FilterBar";
+import PanelSelect from "@/components/ui/PanelSelect";
 import EditScreenDialog from "@/components/screens/EditScreenDialog";
 import type { Role } from "@/lib/roles";
 import {
@@ -364,21 +365,15 @@ export default function ScreensInventory({
         <p className="text-xs text-muted">
           {activeCount > 0 ? "Filters applied" : "All screens"}
         </p>
-        <label className="inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 text-sm text-white/70">
-          <span className="text-xs text-muted">Sort</span>
-          <select
+        <div className="inline-flex items-center gap-2">
+          <span className="text-xs text-[#94a3b8]">Sort</span>
+          <PanelSelect
             value={sort}
-            onChange={(event) => setSort(event.target.value)}
-            aria-label="Sort screens"
-            className="cursor-pointer bg-transparent text-sm text-white outline-none [&>option]:bg-surface-2"
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={setSort}
+            ariaLabel="Sort screens"
+            options={sortOptions}
+          />
+        </div>
       </div>
 
       {rows.length === 0 ? (

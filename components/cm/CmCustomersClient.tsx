@@ -198,12 +198,13 @@ export default function CmCustomersClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {visibleCustomers.map((customer) => {
-                  const href = `/cm/customers/${customer.customer_id}`;
+                {visibleCustomers.map((row) => {
+                  const customer = row;
+                  const href = `/cm/customers/${row.id}`;
 
                   return (
                     <tr
-                      key={customer.customer_id}
+                      key={row.id}
                       className="relative transition duration-200 hover:bg-white/[0.03]"
                     >
                       <td className="max-w-[18rem] px-5 py-3.5">
@@ -249,7 +250,7 @@ export default function CmCustomersClient({
                             {customer.activeCampaigns} live
                           </span>
                         ) : (
-                          <span className="text-muted">—</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3.5">
@@ -280,11 +281,12 @@ export default function CmCustomersClient({
           </div>
 
           <div className="divide-y divide-white/5 md:hidden">
-            {visibleCustomers.map((customer) => {
-              const href = `/cm/customers/${customer.customer_id}`;
+            {visibleCustomers.map((row) => {
+              const customer = row;
+              const href = `/cm/customers/${row.id}`;
 
               return (
-                <div key={customer.customer_id} className="space-y-4 p-4">
+                <div key={row.id} className="space-y-4 p-4">
                   <div className="flex items-start gap-3">
                     <span className="brand-gradient flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold text-white shadow-brand">
                       {customerInitials(customer)}
@@ -323,7 +325,7 @@ export default function CmCustomersClient({
                     <div>
                       <dt className="text-muted">Media</dt>
                       <dd className="mt-0.5 text-white/80 tabular-nums">
-                        {customer.media_count} · {formatBytes(customer.storage_bytes)}
+                        {customer.media_count} - {formatBytes(customer.storage_bytes)}
                       </dd>
                     </div>
                     <div>

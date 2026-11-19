@@ -8,13 +8,11 @@ import {
   managerDisplayName,
   type AdminTeamMember,
 } from "@/lib/admin";
+import PanelSelect from "@/components/ui/PanelSelect";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
-
-const selectClass =
-  "h-9 w-full rounded-full border border-white/10 bg-[#050b1f] px-3 text-xs text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 disabled:cursor-wait disabled:opacity-60 sm:text-sm";
 
 export default function AdminManagerSelect({
   customerId,
@@ -63,22 +61,22 @@ export default function AdminManagerSelect({
       <label htmlFor={id} className="sr-only">
         Assign account manager
       </label>
-      <select
+      <PanelSelect
         id={id}
         value={selected}
-        onChange={(event) => void handleChange(event.target.value)}
+        onChange={(value) => void handleChange(value)}
         disabled={state === "saving"}
-        aria-describedby={state !== "idle" ? `${id}-status` : undefined}
-        className={selectClass}
-      >
-        <option value="">Unassigned</option>
-        {managers.map((manager) => (
-          <option key={manager.id} value={manager.id}>
-            {managerDisplayName(manager)}
-            {manager.role === "admin" ? " (Admin)" : ""}
-          </option>
-        ))}
-      </select>
+        ariaDescribedBy={state !== "idle" ? `${id}-status` : undefined}
+        label="Assign account manager"
+        className="w-full text-xs sm:text-sm"
+        options={[
+          { value: "", label: "Unassigned" },
+          ...managers.map((manager) => ({
+            value: manager.id,
+            label: `${managerDisplayName(manager)}${manager.role === "admin" ? " (Admin)" : ""}`,
+          })),
+        ]}
+      />
 
       {state !== "idle" ? (
         <p

@@ -25,6 +25,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type { Media, Playlist, Screen } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 type AssignmentRow = {
   screen_id: string;
   playlist_id: string;
@@ -44,7 +46,7 @@ export default async function AdminCustomerDetailPage({
     supabase.rpc("admin_list_team"),
   ]);
   const customer = normalizeAdminCustomerStats(statsResult.data).find(
-    (item) => item.customer_id === id,
+    (row) => row.id === id,
   );
 
   if (statsResult.error) {
@@ -70,6 +72,18 @@ export default async function AdminCustomerDetailPage({
   if (!customer) {
     notFound();
   }
+
+  const { data: profileRow } = await supabase
+    .from("profiles")
+    .select("id, full_name, company_name, email")
+    .eq("id", id)
+    .maybeSingle();
+
+  const headerName =
+    profileRow?.full_name ||
+    profileRow?.company_name ||
+    customerDisplayName(customer);
+  const headerEmail = profileRow?.email || customer.email || "";
 
   const managers = normalizeAdminTeam(teamResult.data);
   const managersError = teamResult.error?.message ?? null;
@@ -196,10 +210,15 @@ export default async function AdminCustomerDetailPage({
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-                {customerDisplayName(customer)}
+                {headerName}
               </h1>
               <p className="mt-1 truncate text-sm text-body">
-                {customer.company_name || "Customer account"}
+                {profileRow?.company_name ||
+                  customer.company_name ||
+                  "Customer account"}
+              </p>
+              <p className="mt-1 truncate text-xs text-muted">
+                {headerEmail || "No email on file"}
               </p>
             </div>
           </div>
@@ -220,13 +239,13 @@ export default async function AdminCustomerDetailPage({
               ) : (
                 <>
                   <AdminManagerSelect
-                    customerId={customer.customer_id}
+                    customerId={customer.id}
                     managerId={customer.manager_id}
                     managers={managers}
                     className="mt-2 w-full sm:w-56"
                   />
                   <AdminCustomerDetailHeaderActions
-                    customerId={customer.customer_id}
+                    customerId={customer.id}
                     managerId={customer.manager_id}
                     currentAdminId={currentAdminId}
                   />
@@ -236,7 +255,7 @@ export default async function AdminCustomerDetailPage({
 
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                href={`/cm/customers/${customer.customer_id}`}
+                href={`/cm/customers/${customer.id}`}
                 className="brand-gradient inline-flex shrink-0 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-brand transition duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
               >
                 <Settings2 aria-hidden="true" className="h-4 w-4" />
@@ -248,7 +267,7 @@ export default async function AdminCustomerDetailPage({
                 size="sm"
                 className="h-10 px-4"
               >
-                <Link href={`/cm/customers/${customer.customer_id}`}>
+                <Link href={`/cm/customers/${customer.id}`}>
                   Screens
                 </Link>
               </Button>
@@ -258,7 +277,7 @@ export default async function AdminCustomerDetailPage({
                 size="sm"
                 className="h-10 px-4"
               >
-                <Link href={`/cm/customers/${customer.customer_id}/media`}>
+                <Link href={`/cm/customers/${customer.id}/media`}>
                   Media
                 </Link>
               </Button>
@@ -268,7 +287,7 @@ export default async function AdminCustomerDetailPage({
                 size="sm"
                 className="h-10 px-4"
               >
-                <Link href={`/cm/customers/${customer.customer_id}/playlists`}>
+                <Link href={`/cm/customers/${customer.id}/playlists`}>
                   Playlists
                 </Link>
               </Button>
@@ -284,7 +303,7 @@ export default async function AdminCustomerDetailPage({
               Email
             </dt>
             <dd className="mt-1 break-all text-sm text-white/80">
-              {customer.email || "—"}
+              {customer.email || "-"}
             </dd>
           </div>
           <div>
@@ -292,7 +311,7 @@ export default async function AdminCustomerDetailPage({
               Phone
             </dt>
             <dd className="mt-1 text-sm text-white/80">
-              {customer.phone || "—"}
+              {customer.phone || "-"}
             </dd>
           </div>
           <div>

@@ -42,7 +42,7 @@ export default function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-white/5 bg-[#050b1f]/80 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-white/5 bg-surface/80 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"

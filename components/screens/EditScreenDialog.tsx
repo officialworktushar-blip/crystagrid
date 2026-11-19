@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import DisplaySettingsDialog from "@/components/dashboard/DisplaySettingsDialog";
 import Button from "@/components/ui/Button";
+import PanelSelect from "@/components/ui/PanelSelect";
 import type { AdCity, AdPlace, AdProperty } from "@/lib/ads";
 import type { StaffScreenRow } from "@/lib/staff-screens";
 import { createClient } from "@/lib/supabase/client";
@@ -337,48 +338,49 @@ export default function EditScreenDialog({
               <label htmlFor="edit-screen-city" className="mb-1.5 block text-sm font-medium text-white">
                 City
               </label>
-              <select
+              <PanelSelect
                 id="edit-screen-city"
                 value={cityId}
-                onChange={(event) => {
-                  setCityId(event.target.value);
+                onChange={(value) => {
+                  setCityId(value);
                   setPlaceId("");
                   setPropertyId("");
                 }}
-                className={inputClass}
-              >
-                {citiesData.length === 0 ? (
-                  <option value="">No cities available</option>
-                ) : (
-                  citiesData.map((city) => (
-                    <option key={city.id} value={city.id}>
-                      {city.name}
-                    </option>
-                  ))
-                )}
-              </select>
+                label="City"
+                className="h-11 w-full"
+                options={[
+                  ...(citiesData.length === 0
+                    ? [{ value: "", label: "No cities available" }]
+                    : []),
+                  ...citiesData.map((city) => ({
+                    value: city.id,
+                    label: city.name,
+                  })),
+                ]}
+              />
             </div>
 
             <div>
               <label htmlFor="edit-screen-place" className="mb-1.5 block text-sm font-medium text-white">
                 Place
               </label>
-              <select
+              <PanelSelect
                 id="edit-screen-place"
                 value={placeId}
-                onChange={(event) => {
-                  setPlaceId(event.target.value);
+                onChange={(value) => {
+                  setPlaceId(value);
                   setPropertyId("");
                 }}
-                className={inputClass}
-              >
-                <option value="">All places</option>
-                {cityPlaces.map((place) => (
-                  <option key={place.id} value={place.id}>
-                    {place.name}
-                  </option>
-                ))}
-              </select>
+                label="Place"
+                className="h-11 w-full"
+                options={[
+                  { value: "", label: "All places" },
+                  ...cityPlaces.map((place) => ({
+                    value: place.id,
+                    label: place.name,
+                  })),
+                ]}
+              />
             </div>
           </div>
 
@@ -394,23 +396,22 @@ export default function EditScreenDialog({
               placeholder="Search properties"
               className={inputClass}
             />
-            <select
-              value={propertyId}
-              onChange={(event) => setPropertyId(event.target.value)}
-              aria-label="Property"
-              className={cn(inputClass, "mt-2")}
-            >
-              <option value="">Not placed</option>
-              {groupedProperties.map(([placeName, items]) => (
-                <optgroup key={placeName} label={placeName}>
-                  {items.map((property) => (
-                    <option key={property.id} value={property.id}>
-                      {property.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <div className="mt-2">
+              <PanelSelect
+                value={propertyId}
+                onChange={setPropertyId}
+                ariaLabel="Property"
+                className="h-11 w-full"
+                options={[{ value: "", label: "Not placed" }]}
+                groups={groupedProperties.map(([placeName, items]) => ({
+                  label: placeName,
+                  options: items.map((property) => ({
+                    value: property.id,
+                    label: property.name,
+                  })),
+                }))}
+              />
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

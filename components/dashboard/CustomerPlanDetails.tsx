@@ -61,7 +61,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending: "border-amber-400/20 bg-amber-400/10 text-amber-300",
   confirmed: "border-sky-400/20 bg-sky-400/10 text-sky-300",
   running: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-  completed: "border-violet-400/20 bg-violet-400/10 text-violet-300",
+  completed: "border-blue-400/20 bg-blue-400/10 text-blue-300",
   cancelled: "border-red-400/20 bg-red-400/10 text-red-300",
 };
 

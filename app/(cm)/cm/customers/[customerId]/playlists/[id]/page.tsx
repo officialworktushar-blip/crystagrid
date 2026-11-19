@@ -11,6 +11,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type { Media, Playlist, PlaylistItem } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export default async function CmCustomerPlaylistDetailPage({
   params,
 }: {

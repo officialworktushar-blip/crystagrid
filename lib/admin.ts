@@ -2,6 +2,7 @@ import { isRole, type Role } from "@/lib/roles";
 import type { ScreenStatus } from "@/lib/types";
 
 export interface AdminCustomerStats {
+  id: string;
   customer_id: string;
   full_name: string | null;
   company_name: string | null;
@@ -134,8 +135,8 @@ export function normalizeAdminCustomerStats(
     }
 
     const customerId = pickString(row, [
-      "customer_id",
       "id",
+      "customer_id",
       "user_id",
       "profile_id",
     ]);
@@ -145,6 +146,7 @@ export function normalizeAdminCustomerStats(
     }
 
     customers.push({
+      id: customerId,
       customer_id: customerId,
       full_name: pickString(row, [
         "full_name",
@@ -296,12 +298,12 @@ export function joinedTimestamp(customer: AdminCustomerStats): number {
 
 export function formatAdminDate(value: string | null | undefined): string {
   if (!value) {
-    return "—";
+    return "-";
   }
 
   const timestamp = Date.parse(value);
 
-  return Number.isFinite(timestamp) ? dateFormatter.format(timestamp) : "—";
+  return Number.isFinite(timestamp) ? dateFormatter.format(timestamp) : "-";
 }
 
 export function formatStorage(bytes: number): string {

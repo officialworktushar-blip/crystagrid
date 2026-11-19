@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CalendarDays, Filter, Search } from "lucide-react";
+import PanelSelect from "@/components/ui/PanelSelect";
 import { cn } from "@/lib/utils";
 
 type SelectOption = { value: string; label: string };
@@ -30,7 +31,7 @@ type DateRangeFilter = {
 };
 
 const pillClass =
-  "inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 text-sm text-white/70 transition duration-200 focus-within:border-sky-400/50 focus-within:ring-2 focus-within:ring-sky-400/30";
+  "inline-flex h-10 items-center gap-2 rounded-full border border-white/[0.12] bg-surface-2 px-3.5 text-sm text-[#e2e8f0] transition duration-200 focus-within:border-sky-400/50 focus-within:ring-2 focus-within:ring-sky-400/30";
 
 export default function FilterBar({
   search,
@@ -60,36 +61,31 @@ export default function FilterBar({
   const controls = (
     <>
       <label className={pillClass}>
-        <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-white/40" />
+        <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-[#94a3b8]" />
         <input
           type="search"
           value={search.value}
           onChange={(event) => search.onChange(event.target.value)}
           placeholder={search.placeholder}
           aria-label={search.placeholder}
-          className="w-36 bg-transparent text-sm text-white outline-none placeholder:text-muted sm:w-44"
+          className="w-36 bg-transparent text-sm text-[#e2e8f0] outline-none placeholder:text-[#64748b] sm:w-44"
         />
       </label>
 
       {selects.map((item) => (
-        <label key={item.key} className={pillClass}>
-          <span className="shrink-0 text-xs text-muted">{item.label}</span>
-          <select
+        <div key={item.key} className="inline-flex items-center gap-2">
+          <span className="shrink-0 text-xs text-[#94a3b8]">{item.label}</span>
+          <PanelSelect
             value={item.value}
-            onChange={(event) => item.onChange(event.target.value)}
-            aria-label={item.label}
-            className="max-w-[9rem] cursor-pointer bg-transparent text-sm text-white outline-none [&>option]:bg-surface-2"
-          >
-            <option value="">{item.allLabel ?? "All"}</option>
-            {item.options
-              .filter((option) => option.value !== "")
-              .map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-          </select>
-        </label>
+            onChange={item.onChange}
+            label={item.label}
+            options={[
+              { value: "", label: item.allLabel ?? "All" },
+              ...item.options.filter((option) => option.value !== ""),
+            ]}
+            className="max-w-[9rem]"
+          />
+        </div>
       ))}
 
       {toggles.map((item) => (
@@ -102,15 +98,15 @@ export default function FilterBar({
             pillClass,
             "cursor-pointer",
             item.checked
-              ? "border-sky-400/40 bg-sky-400/10 text-white"
-              : "hover:border-white/20 hover:text-white",
+              ? "border-sky-400/40 bg-sky-400/10 text-[#e2e8f0]"
+              : "hover:border-white/20 hover:text-[#e2e8f0]",
           )}
         >
           <span
             aria-hidden="true"
             className={cn(
               "h-2 w-2 shrink-0 rounded-full",
-              item.checked ? "bg-brand-sky shadow-brand" : "bg-white/30",
+              item.checked ? "bg-brand-sky shadow-brand" : "bg-[#64748b]",
             )}
           />
           {item.label}
@@ -121,9 +117,9 @@ export default function FilterBar({
         <div className={pillClass}>
           <CalendarDays
             aria-hidden="true"
-            className="h-4 w-4 shrink-0 text-white/40"
+            className="h-4 w-4 shrink-0 text-[#94a3b8]"
           />
-          <span className="shrink-0 text-xs text-muted">
+          <span className="shrink-0 text-xs text-[#94a3b8]">
             {dateRange.label ?? "Date range"}
           </span>
           <input
@@ -133,9 +129,9 @@ export default function FilterBar({
               dateRange.onChange({ from: event.target.value, to: dateRange.to })
             }
             aria-label={`${dateRange.label ?? "Date range"} from`}
-            className="bg-transparent text-xs text-white outline-none"
+            className="bg-transparent text-xs text-[#e2e8f0] outline-none"
           />
-          <span className="text-xs text-muted">–</span>
+          <span className="text-xs text-[#64748b]">–</span>
           <input
             type="date"
             value={dateRange.to}
@@ -143,7 +139,7 @@ export default function FilterBar({
               dateRange.onChange({ from: dateRange.from, to: event.target.value })
             }
             aria-label={`${dateRange.label ?? "Date range"} to`}
-            className="bg-transparent text-xs text-white outline-none"
+            className="bg-transparent text-xs text-[#e2e8f0] outline-none"
           />
         </div>
       ) : null}
@@ -161,7 +157,7 @@ export default function FilterBar({
           type="button"
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((current) => !current)}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 text-sm font-semibold text-white/70 transition duration-200 hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:hidden"
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-white/[0.12] bg-surface-2 px-3.5 text-sm font-semibold text-[#e2e8f0] transition duration-200 hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:hidden"
         >
           <Filter aria-hidden="true" className="h-4 w-4" />
           Filters
@@ -175,13 +171,13 @@ export default function FilterBar({
         <button
           type="button"
           onClick={onClear}
-          className="rounded-full px-3 py-2 text-xs font-semibold text-white/50 transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+          className="rounded-full px-3 py-2 text-xs font-semibold text-[#94a3b8] transition duration-200 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
         >
           Clear filters
         </button>
 
-        <p className="ml-auto text-xs text-muted">
-          Showing <span className="font-semibold text-white">{resultCount}</span>{" "}
+        <p className="ml-auto text-xs text-[#94a3b8]">
+          Showing <span className="font-semibold text-[#e2e8f0]">{resultCount}</span>{" "}
           of {total}
         </p>
       </div>

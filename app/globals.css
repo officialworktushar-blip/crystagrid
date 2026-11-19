@@ -75,3 +75,63 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Panel scope: only dashboard, admin and panel layouts, not marketing/booking/player. */
+.panel-theme {
+  --panel-bg: #020617;
+  --panel-surface: #0a1226;
+  --panel-surface-2: #0f1b3a;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-text: #e2e8f0;
+  --panel-muted: #94a3b8;
+  --panel-sky: #38bdf8;
+  color-scheme: dark;
+  background-color: var(--panel-bg);
+  color: var(--panel-text);
+}
+
+.panel-theme select,
+.panel-theme input,
+.panel-theme textarea {
+  background-color: var(--panel-surface-2);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+}
+
+.panel-theme select option,
+.panel-theme select optgroup {
+  background-color: #0f1b3a;
+  color: #e2e8f0;
+}
+
+.panel-theme select:disabled,
+.panel-theme input:disabled,
+.panel-theme textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.panel-theme .panel-select {
+  border-radius: 9999px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background-color: #0f1b3a;
+  color: #e2e8f0;
+}
+
+.panel-theme input[type="checkbox"],
+.panel-theme input[type="radio"],
+.panel-theme input[type="range"] {
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  opacity: 1;
+  cursor: pointer;
+}
+
+.panel-theme input[type="checkbox"]:disabled,
+.panel-theme input[type="radio"]:disabled,
+.panel-theme input[type="range"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

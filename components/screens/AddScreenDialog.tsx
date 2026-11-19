@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEve
 import { Loader2, Plus, X } from "lucide-react";
 import DisplaySettingsDialog from "@/components/dashboard/DisplaySettingsDialog";
 import Button from "@/components/ui/Button";
+import PanelSelect from "@/components/ui/PanelSelect";
 import type { AdCity, AdPlace, AdProperty } from "@/lib/ads";
 import { createClient } from "@/lib/supabase/client";
 import type { Screen } from "@/lib/types";
@@ -403,48 +404,49 @@ export default function AddScreenDialog({
                   <label htmlFor="screen-city" className="mb-1.5 block text-sm font-medium text-white">
                     City
                   </label>
-                  <select
+                  <PanelSelect
                     id="screen-city"
                     value={cityId}
-                    onChange={(event) => {
-                      setCityId(event.target.value);
+                    onChange={(value) => {
+                      setCityId(value);
                       setPlaceId("");
                       setPropertyId("");
                     }}
-                    className={inputClass}
-                  >
-                    {citiesData.length === 0 ? (
-                      <option value="">No cities available</option>
-                    ) : (
-                      citiesData.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    label="City"
+                    className="h-11 w-full"
+                    options={[
+                      ...(citiesData.length === 0
+                        ? [{ value: "", label: "No cities available" }]
+                        : []),
+                      ...citiesData.map((city) => ({
+                        value: city.id,
+                        label: city.name,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <label htmlFor="screen-place" className="mb-1.5 block text-sm font-medium text-white">
                     Place
                   </label>
-                  <select
+                  <PanelSelect
                     id="screen-place"
                     value={placeId}
-                    onChange={(event) => {
-                      setPlaceId(event.target.value);
+                    onChange={(value) => {
+                      setPlaceId(value);
                       setPropertyId("");
                     }}
-                    className={inputClass}
-                  >
-                    <option value="">All places</option>
-                    {cityPlaces.map((place) => (
-                      <option key={place.id} value={place.id}>
-                        {place.name}
-                      </option>
-                    ))}
-                  </select>
+                    label="Place"
+                    className="h-11 w-full"
+                    options={[
+                      { value: "", label: "All places" },
+                      ...cityPlaces.map((place) => ({
+                        value: place.id,
+                        label: place.name,
+                      })),
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -465,23 +467,22 @@ export default function AddScreenDialog({
                     Ask a Sales Manager to add the property first
                   </p>
                 ) : (
-                  <select
-                    value={propertyId}
-                    onChange={(event) => setPropertyId(event.target.value)}
-                    aria-label="Property"
-                    className={cn(inputClass, "mt-2")}
-                  >
-                    <option value="">Choose a property</option>
-                    {groupedProperties.map(([placeName, items]) => (
-                      <optgroup key={placeName} label={placeName}>
-                        {items.map((property) => (
-                          <option key={property.id} value={property.id}>
-                            {property.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <div className="mt-2">
+                    <PanelSelect
+                      value={propertyId}
+                      onChange={setPropertyId}
+                      ariaLabel="Property"
+                      className="h-11 w-full"
+                      options={[{ value: "", label: "Choose a property" }]}
+                      groups={groupedProperties.map(([placeName, items]) => ({
+                        label: placeName,
+                        options: items.map((property) => ({
+                          value: property.id,
+                          label: property.name,
+                        })),
+                      }))}
+                    />
+                  </div>
                 )}
               </div>
 

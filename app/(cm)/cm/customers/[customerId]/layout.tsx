@@ -8,6 +8,8 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -72,7 +74,7 @@ export default async function CmCustomerLayout({
 
   const { data: profileRow, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, company_name, role")
+    .select("id, full_name, company_name, email, role")
     .eq("id", customerId)
     .maybeSingle();
 
@@ -94,7 +96,13 @@ export default async function CmCustomerLayout({
     : "Customer account";
   const title =
     profileRow.full_name || profileRow.company_name || "Customer";
-  const description = profileRow.company_name ?? `Account role: ${roleLabel}`;
+  const description = [
+    profileRow.company_name,
+    profileRow.email,
+    `Account role: ${roleLabel}`,
+  ]
+    .filter(Boolean)
+    .join(" - ");
 
   return (
     <div className="space-y-6">

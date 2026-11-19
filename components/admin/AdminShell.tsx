@@ -22,7 +22,7 @@ export default function AdminShell({
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="panel-theme min-h-screen bg-background text-white">
       <AdminSidebar open={sidebarOpen} onClose={closeSidebar} />
 
       <div className="lg:pl-64">

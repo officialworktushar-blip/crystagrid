@@ -136,14 +136,14 @@ export default async function DeviceOverviewPage() {
       value: rows.filter((row) => !row.property_id).length,
       description: "No property assigned",
       icon: MapPinOff,
-      tone: "border-violet-400/20 bg-violet-400/10 text-violet-200",
+      tone: "border-white/10 bg-white/5 text-white/50",
     },
     {
       label: "Added this week",
       value: rows.filter((row) => Date.parse(row.created_at) >= oneWeekAgo).length,
       description: "New screens in 7 days",
       icon: CalendarPlus,
-      tone: "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200",
+      tone: "border-sky-400/20 bg-sky-400/10 text-sky-200",
     },
   ];
 

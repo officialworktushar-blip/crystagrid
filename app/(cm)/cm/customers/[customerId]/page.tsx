@@ -6,6 +6,8 @@ import { normalizeCmBookings } from "@/lib/cm";
 import { createClient } from "@/lib/supabase/server";
 import type { Media, Playlist, PlaylistItem } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 type PackagePropertyRow = {
   package_id: string;
   property_id: string;

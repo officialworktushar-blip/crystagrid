@@ -138,25 +138,25 @@ export default async function AdminOverviewPage() {
       label: "Customers",
       value: String(customers.length),
       icon: Users,
-      accent: "text-violet-300",
+      accent: "text-brand-sky",
     },
     {
       label: "Account managers",
       value: String(managers.length),
       icon: UsersRound,
-      accent: "text-cyan-300",
+      accent: "text-blue-300",
     },
     {
       label: "Customers without a manager",
       value: String(customersWithoutManager),
       icon: UserX,
-      accent: "text-rose-300",
+      accent: "text-red-300",
     },
     {
       label: "Leads",
       value: String(leadsResult.count ?? 0),
       icon: Inbox,
-      accent: "text-pink-300",
+      accent: "text-brand-blue",
     },
     {
       label: "Pending bookings",
@@ -255,10 +255,13 @@ export default async function AdminOverviewPage() {
             </p>
           ) : (
             <ul className="divide-y divide-white/5">
-              {newestCustomers.map((customer) => (
-                <li key={customer.customer_id}>
-                  <Link
-                    href={`/admin/customers/${customer.customer_id}`}
+                {newestCustomers.map((row) => {
+                  const customer = row;
+
+                  return (
+                  <li key={row.id}>
+                    <Link
+                      href={`/admin/customers/${row.id}`}
                     className="flex items-center justify-between gap-4 px-5 py-3.5 transition duration-200 hover:bg-white/[0.03]"
                   >
                     <div className="min-w-0">
@@ -276,8 +279,9 @@ export default async function AdminOverviewPage() {
                       {formatAdminDate(customer.joined_at)}
                     </span>
                   </Link>
-                </li>
-              ))}
+                  </li>
+                  );
+                })}
             </ul>
           )}
         </Card>
@@ -307,7 +311,7 @@ export default async function AdminOverviewPage() {
           ) : (
             <ul className="divide-y divide-white/5">
               {recentScreens.map((screen) => {
-                const customer = screen.customer_id
+                const row = screen.customer_id
                   ? customerById.get(screen.customer_id)
                   : undefined;
                 const online = isOnline(screen.last_seen, now);
@@ -330,12 +334,12 @@ export default async function AdminOverviewPage() {
                         <p className="truncate text-sm font-semibold text-white">
                           {screen.name}
                         </p>
-                        {customer ? (
+                        {row ? (
                           <Link
-                            href={`/admin/customers/${customer.customer_id}`}
+                            href={`/admin/customers/${row.id}`}
                             className="mt-0.5 block truncate text-xs text-body transition duration-200 hover:text-brand-sky"
                           >
-                            {customerDisplayName(customer)}
+                            {customerDisplayName(row)}
                           </Link>
                         ) : (
                           <p className="mt-0.5 text-xs text-body">

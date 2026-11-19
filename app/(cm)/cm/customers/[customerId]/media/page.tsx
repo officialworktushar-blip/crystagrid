@@ -3,6 +3,8 @@ import MediaClient from "@/components/dashboard/MediaClient";
 import { createClient } from "@/lib/supabase/server";
 import type { Media } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export default async function CmCustomerMediaPage({
   params,
 }: {

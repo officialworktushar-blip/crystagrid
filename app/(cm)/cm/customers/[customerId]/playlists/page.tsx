@@ -5,6 +5,8 @@ import PlaylistsClient, {
 import { createClient } from "@/lib/supabase/server";
 import type { Media, Playlist } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 type PlaylistItemRow = {
   playlist_id: string;
   media_id: string;

@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, Phone, UsersRound } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import PanelSelect from "@/components/ui/PanelSelect";
 import { managerDisplayName, type AdminTeamMember } from "@/lib/admin";
 import { isRole, ROLE_LABELS, type Role } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
@@ -33,9 +34,6 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   ...STAFF_ROLES,
   CUSTOMER_OPTION,
 ];
-
-const selectClass =
-  "h-11 w-full cursor-pointer rounded-2xl border border-white/10 bg-surface-2 px-4 text-sm text-white outline-none transition focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/40 [&>option]:bg-surface-2";
 
 function RoleChip({ role }: { role: Role }) {
   return (
@@ -204,23 +202,22 @@ export default function AdminTeamClient({
             <label htmlFor="team-role" className="sr-only">
               Role
             </label>
-            <select
+            <PanelSelect
               id="team-role"
               value={role}
-              onChange={(event) => {
-                const nextRole = event.target.value;
-                if (isRole(nextRole) && nextRole !== "admin" && nextRole !== "customer") {
+              onChange={(nextRole) => {
+                if (
+                  isRole(nextRole) &&
+                  nextRole !== "admin" &&
+                  nextRole !== "customer"
+                ) {
                   setRole(nextRole);
                 }
               }}
-              className={selectClass}
-            >
-              {STAFF_ROLES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              label="Role"
+              className="h-11 w-full"
+              options={STAFF_ROLES}
+            />
           </div>
           <Button type="submit" disabled={adding} className="shrink-0 sm:h-11">
             {adding ? "Adding..." : "Add team member"}
@@ -340,30 +337,18 @@ export default function AdminTeamClient({
                               </Link>
                             ) : null}
                             {canChangeRole ? (
-                              <select
-                                aria-label={`Change role for ${managerDisplayName(member)}`}
+                              <PanelSelect
+                                ariaLabel={`Change role for ${managerDisplayName(member)}`}
                                 value={member.role}
                                 disabled={updatingId === member.id}
-                                onChange={(event) => {
-                                  const nextRole = event.target.value;
+                                onChange={(nextRole) => {
                                   if (isRole(nextRole)) {
                                     void handleRoleChange(member, nextRole);
                                   }
                                 }}
-                                className={cn(
-                                  selectClass,
-                                  "h-9 max-w-[15rem] px-3 text-xs disabled:opacity-50",
-                                )}
-                              >
-                                {ROLE_OPTIONS.map((option) => (
-                                  <option
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
+                                className="h-9 max-w-[15rem] text-xs"
+                                options={ROLE_OPTIONS}
+                              />
                             ) : null}
                           </div>
                         </td>
@@ -425,24 +410,19 @@ export default function AdminTeamClient({
                         >
                           Role
                         </label>
-                        <select
+                        <PanelSelect
                           id={`role-${member.id}`}
                           value={member.role}
                           disabled={updatingId === member.id}
-                          onChange={(event) => {
-                            const nextRole = event.target.value;
+                          onChange={(nextRole) => {
                             if (isRole(nextRole)) {
                               void handleRoleChange(member, nextRole);
                             }
                           }}
-                          className={cn(selectClass, "text-xs disabled:opacity-50")}
-                        >
-                          {ROLE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                          label="Role"
+                          className="w-full text-xs"
+                          options={ROLE_OPTIONS}
+                        />
                       </div>
                     ) : null}
 

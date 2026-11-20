@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import PanelPageHeader from "@/components/admin/PanelPageHeader";
 import HouseAssignments from "@/components/house/HouseAssignments";
 import HouseTabs from "@/components/house/HouseTabs";
@@ -37,7 +38,15 @@ export default async function AdminHousePage() {
           No company account found. Make sure an admin account exists.
         </div>
       ) : (
-        <HouseAssignments ownerId={ownerId} playlists={playlists} />
+        <Suspense
+          fallback={
+            <div className="rounded-3xl border border-white/10 bg-surface px-6 py-16 text-center text-sm text-muted">
+              Loading company content settings...
+            </div>
+          }
+        >
+          <HouseAssignments ownerId={ownerId} playlists={playlists} />
+        </Suspense>
       )}
     </div>
   );

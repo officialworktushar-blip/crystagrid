@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MapPin, Pencil, Settings, Trash2 } from "lucide-react";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import Button from "@/components/ui/Button";
@@ -26,10 +26,28 @@ type InventoryFilters = {
   property: string;
   type: string;
   status: string;
+  playing: string;
   client: string;
   addedBy: string;
   unplaced: boolean;
   activeCampaign: boolean;
+  nothingPlaying: boolean;
+};
+
+type PlayingValue = "campaign" | "house" | "none";
+type PlayingTone = "muted" | PlayingValue;
+
+type HousePlayingRow = {
+  screenId: string;
+  activeCampaigns: number;
+  playlistName: string | null;
+  playing: PlayingValue;
+};
+
+type PlayingInfo = {
+  tone: PlayingTone;
+  label: string;
+  detail: string | null;
 };
 
 const initialFilters: InventoryFilters = {
@@ -39,10 +57,12 @@ const initialFilters: InventoryFilters = {
   property: "",
   type: "",
   status: "",
+  playing: "",
   client: "",
   addedBy: "",
   unplaced: false,
   activeCampaign: false,
+  nothingPlaying: false,
 };
 
 const sortOptions = [
@@ -69,6 +89,121 @@ function hasActiveCampaign(row: StaffScreenRow) {
   return (row.active_bookings ?? 0) > 0 || (row.active_clients?.length ?? 0) > 0;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function readString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readCount(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.floor(value));
+  }
+
+  return 0;
+}
+
+function normalizeHousePlayingRow(value: unknown): HousePlayingRow | null {
+  const row = asRecord(value);
+  const screenId = row ? readString(row.screen_id) : null;
+  const playing = row ? readString(row.playing) : null;
+
+  if (
+    !row ||
+    !screenId ||
+    (playing !== "campaign" && playing !== "house" && playing !== "none")
+  ) {
+    return null;
+  }
+
+  return {
+    screenId,
+    activeCampaigns: readCount(row.active_campaigns),
+    playlistName: readString(row.playlist_name),
+    playing,
+  };
+}
+
+function playingInfo(
+  row: HousePlayingRow | null,
+  loading: boolean,
+): PlayingInfo {
+  if (loading || !row) {
+    return { tone: "muted", label: "-", detail: null };
+  }
+
+  if (row.playing === "campaign") {
+    return {
+      tone: "campaign",
+      label: `Client campaigns (${row.activeCampaigns})`,
+      detail: null,
+    };
+  }
+
+  if (row.playing === "house") {
+    return {
+      tone: "house",
+      label: "Company content",
+      detail: row.playlistName,
+    };
+  }
+
+  return { tone: "none", label: "Nothing playing", detail: null };
+}
+
+function PlayingNowChip({
+  row,
+  loading,
+}: {
+  row: HousePlayingRow | null;
+  loading: boolean;
+}) {
+  const info = playingInfo(row, loading);
+
+  if (info.tone === "muted") {
+    return <span className="text-xs text-muted">-</span>;
+  }
+
+  if (info.tone === "campaign") {
+    return (
+      <span className="inline-flex w-fit items-center rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-semibold text-emerald-200">
+        {info.label}
+      </span>
+    );
+  }
+
+  if (info.tone === "house") {
+    return (
+      <span className="inline-flex w-fit flex-col items-start rounded-full border border-sky-400/25 bg-sky-400/10 px-2.5 py-1 text-xs font-semibold text-sky-200">
+        {info.label}
+        {info.detail ? (
+          <span className="text-[10px] font-normal text-sky-200/70">
+            {info.detail}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex w-fit items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
+      {info.label}
+    </span>
+  );
+}
+
 export default function ScreensInventory({
   rows,
   canEdit,
@@ -87,6 +222,72 @@ export default function ScreensInventory({
   const [deletingRow, setDeletingRow] = useState<StaffScreenRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [houseOverview, setHouseOverview] = useState<
+    Record<string, HousePlayingRow>
+  >({});
+  const [houseLoading, setHouseLoading] = useState(true);
+  const overviewMountedRef = useRef(true);
+
+  const loadHouseOverview = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("house_screens_overview");
+
+      if (error) {
+        return;
+      }
+
+      const next: Record<string, HousePlayingRow> = {};
+
+      for (const entry of Array.isArray(data) ? data : []) {
+        const row = normalizeHousePlayingRow(entry);
+
+        if (row) {
+          next[row.screenId] = row;
+        }
+      }
+
+      if (overviewMountedRef.current) {
+        setHouseOverview(next);
+      }
+    } catch {
+      return;
+    } finally {
+      if (overviewMountedRef.current) {
+        setHouseLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    overviewMountedRef.current = true;
+    void loadHouseOverview();
+
+    return () => {
+      overviewMountedRef.current = false;
+    };
+  }, [loadHouseOverview]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadHouseOverview();
+      }
+    }, 30000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadHouseOverview();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [loadHouseOverview]);
 
   const cityOptions = useMemo(
     () =>
@@ -214,6 +415,16 @@ export default function ScreensInventory({
         return false;
       }
 
+      const info = playingInfo(houseOverview[row.id] ?? null, houseLoading);
+
+      if (filters.playing && info.tone !== filters.playing) {
+        return false;
+      }
+
+      if (filters.nothingPlaying && info.tone !== "none") {
+        return false;
+      }
+
       return true;
     });
 
@@ -230,7 +441,7 @@ export default function ScreensInventory({
 
       return Date.parse(right.created_at) - Date.parse(left.created_at);
     });
-  }, [filters, rows, sort]);
+  }, [filters, houseLoading, houseOverview, rows, sort]);
 
   const editingSiblingsCount = editingRow?.property_id
     ? rows.filter((row) => row.property_id === editingRow.property_id).length
@@ -314,6 +525,20 @@ export default function ScreensInventory({
       ],
     },
     {
+      key: "playing",
+      label: "Playing",
+      value: filters.playing,
+      onChange: (value: string) => {
+        set("playing", value);
+        set("nothingPlaying", value === "none");
+      },
+      options: [
+        { value: "campaign", label: "Client campaigns" },
+        { value: "house", label: "Company content" },
+        { value: "none", label: "Nothing playing" },
+      ],
+    },
+    {
       key: "client",
       label: "Client",
       value: filters.client,
@@ -354,6 +579,20 @@ export default function ScreensInventory({
             label: "With active campaign",
             checked: filters.activeCampaign,
             onChange: (value) => set("activeCampaign", value),
+          },
+          {
+            key: "nothingPlaying",
+            label: "Nothing playing only",
+            checked: filters.nothingPlaying,
+            onChange: (value) => {
+              set("nothingPlaying", value);
+
+              if (value) {
+                set("playing", "none");
+              } else if (filters.playing === "none") {
+                set("playing", "");
+              }
+            },
           },
         ]}
         resultCount={filteredRows.length}
@@ -401,6 +640,7 @@ export default function ScreensInventory({
                   <th className="px-5 py-3.5">Screen</th>
                   <th className="px-5 py-3.5">Location</th>
                   <th className="px-5 py-3.5">Client</th>
+                  <th className="px-5 py-3.5">Playing now</th>
                   <th className="px-5 py-3.5">Status</th>
                   <th className="px-5 py-3.5">Last seen</th>
                   <th className="px-5 py-3.5">Campaign</th>
@@ -439,8 +679,14 @@ export default function ScreensInventory({
                     </td>
                     <td className="px-5 py-4">
                       <p className="text-sm text-white/80">
-                        {row.owner_name ?? "—"}
+                        {row.owner_name ?? "-"}
                       </p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <PlayingNowChip
+                        row={houseOverview[row.id] ?? null}
+                        loading={houseLoading}
+                      />
                     </td>
                     <td className="px-5 py-4">
                       <StatusBadge status={staffScreenStatus(row)} />
@@ -549,7 +795,7 @@ export default function ScreensInventory({
                   <div>
                     <p className="text-muted">Client</p>
                     <p className="mt-0.5 truncate text-white/80">
-                      {row.owner_name ?? "—"}
+                      {row.owner_name ?? "-"}
                     </p>
                   </div>
                   <div>
@@ -576,6 +822,16 @@ export default function ScreensInventory({
                     <p className="mt-0.5 truncate text-white/80">
                       {addedByLabel(row)}
                     </p>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <p className="text-xs text-muted">Playing now</p>
+                  <div className="mt-1">
+                    <PlayingNowChip
+                      row={houseOverview[row.id] ?? null}
+                      loading={houseLoading}
+                    />
                   </div>
                 </div>
 

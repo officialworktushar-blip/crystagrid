@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -374,6 +374,7 @@ export default function HouseAssignments({
 }) {
   const supabase = useMemo(() => createClient(), []);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const mountedRef = useRef(true);
 
   const [screens, setScreens] = useState<ScreenRow[]>([]);
@@ -383,8 +384,19 @@ export default function HouseAssignments({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [screenFilters, setScreenFilters] =
-    useState<ScreenFilters>(EMPTY_SCREEN_FILTERS);
+  const [screenFilters, setScreenFilters] = useState<ScreenFilters>(() => {
+    const param = searchParams?.get("playing") ?? null;
+    const playing =
+      param === "none" || param === "house" || param === "campaign"
+        ? param
+        : "";
+
+    return {
+      ...EMPTY_SCREEN_FILTERS,
+      playing,
+      nothingOnly: playing === "none",
+    };
+  });
   const [propertyFilters, setPropertyFilters] =
     useState<PropertyFilters>(EMPTY_PROPERTY_FILTERS);
 

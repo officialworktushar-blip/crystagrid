@@ -6,6 +6,8 @@ import {
   CalendarClock,
   Inbox,
   Monitor,
+  MonitorOff,
+  MonitorPlay,
   Package,
   Wifi,
   type LucideIcon,
@@ -30,6 +32,38 @@ type SalesStatCardProps = {
   accent: string;
   href?: string;
 };
+
+type HousePlayingCounts = {
+  none: number;
+  house: number;
+};
+
+function countHousePlaying(value: unknown): HousePlayingCounts {
+  const counts: HousePlayingCounts = { none: 0, house: 0 };
+
+  if (!Array.isArray(value)) {
+    return counts;
+  }
+
+  for (const entry of value) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      continue;
+    }
+
+    const row = entry as Record<string, unknown>;
+    const playing = typeof row.playing === "string" ? row.playing : null;
+
+    if (playing === "none") {
+      counts.none += 1;
+    }
+
+    if (playing === "house") {
+      counts.house += 1;
+    }
+  }
+
+  return counts;
+}
 
 function SalesStatCard({
   label,
@@ -94,6 +128,7 @@ export default async function SalesOverview() {
     screensResult,
     propertyStatsResult,
     newestPendingResult,
+    houseResult,
   ] = await Promise.all([
     supabase
       .from("ad_bookings")
@@ -125,6 +160,7 @@ export default async function SalesOverview() {
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase.rpc("house_screens_overview"),
   ]);
 
   const screens = normalizeStaffScreens(screensResult.data);
@@ -133,6 +169,7 @@ export default async function SalesOverview() {
     (row) => row.screens_count === 0,
   ).length;
   const pendingBookings = normalizeAdBookings(newestPendingResult.data);
+  const houseCounts = countHousePlaying(houseResult.data);
   const loadErrorMessage =
     pendingResult.error?.message ??
     activeResult.error?.message ??
@@ -142,6 +179,7 @@ export default async function SalesOverview() {
     screensResult.error?.message ??
     propertyStatsResult.error?.message ??
     newestPendingResult.error?.message ??
+    houseResult.error?.message ??
     null;
 
   const statCards: SalesStatCardProps[] = [
@@ -160,7 +198,7 @@ export default async function SalesOverview() {
       href: "/sales/bookings",
     },
     {
-      label: "New leads · 7 days",
+      label: "New leads - 7 days",
       value: String(leadsResult.count ?? 0),
       icon: Inbox,
       accent: "text-brand-blue",
@@ -193,6 +231,20 @@ export default async function SalesOverview() {
       icon: Wifi,
       accent: "text-emerald-300",
       href: "/sales/screens",
+    },
+    {
+      label: "Screens with nothing playing",
+      value: String(houseCounts.none),
+      icon: MonitorOff,
+      accent: "text-amber-300",
+      href: "/sales/house?playing=none",
+    },
+    {
+      label: "Showing company content",
+      value: String(houseCounts.house),
+      icon: MonitorPlay,
+      accent: "text-sky-300",
+      href: "/sales/house",
     },
     {
       label: "Properties without screens",
@@ -256,12 +308,12 @@ export default async function SalesOverview() {
                     <p className="truncate text-sm font-semibold text-white">
                       {booking.customerName}
                       {booking.companyName
-                        ? ` · ${booking.companyName}`
+                        ? ` - ${booking.companyName}`
                         : ""}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-body">
-                      {formatBookingId(booking.id)} ·{" "}
-                      {booking.city || "City not set"} ·{" "}
+                      {formatBookingId(booking.id)} -{" "}
+                      {booking.city || "City not set"} -{" "}
                       {formatBookingStatus(booking.status)}
                     </p>
                   </div>

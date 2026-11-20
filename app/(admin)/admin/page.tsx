@@ -7,6 +7,8 @@ import {
   Images,
   Inbox,
   Monitor,
+  MonitorOff,
+  MonitorPlay,
   Users,
   UsersRound,
   UserX,
@@ -41,16 +43,55 @@ type AdminStatCardProps = {
   value: string;
   icon: LucideIcon;
   accent: string;
+  href?: string;
 };
+
+type HousePlayingCounts = {
+  none: number;
+  house: number;
+};
+
+function countHousePlaying(value: unknown): HousePlayingCounts {
+  const counts: HousePlayingCounts = { none: 0, house: 0 };
+
+  if (!Array.isArray(value)) {
+    return counts;
+  }
+
+  for (const entry of value) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      continue;
+    }
+
+    const row = entry as Record<string, unknown>;
+    const playing = typeof row.playing === "string" ? row.playing : null;
+
+    if (playing === "none") {
+      counts.none += 1;
+    }
+
+    if (playing === "house") {
+      counts.house += 1;
+    }
+  }
+
+  return counts;
+}
 
 function AdminStatCard({
   label,
   value,
   icon: Icon,
   accent,
+  href,
 }: AdminStatCardProps) {
-  return (
-    <Card className="p-5">
+  const content = (
+    <Card
+      className={cn(
+        "p-5",
+        href ? "transition duration-200 hover:border-sky-400/30 hover:shadow-brand" : "",
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-body">{label}</p>
         <span
@@ -62,10 +103,26 @@ function AdminStatCard({
           <Icon aria-hidden="true" className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-4 text-2xl font-extrabold tracking-tight text-white tabular-nums">
-        {value}
-      </p>
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <p className="text-2xl font-extrabold tracking-tight text-white tabular-nums">
+          {value}
+        </p>
+        {href ? (
+          <ArrowRight
+            aria-hidden="true"
+            className="h-4 w-4 text-white/30 transition duration-200 group-hover:text-white"
+          />
+        ) : null}
+      </div>
     </Card>
+  );
+
+  return href ? (
+    <Link href={href} className="group block">
+      {content}
+    </Link>
+  ) : (
+    content
   );
 }
 
@@ -80,6 +137,7 @@ export default async function AdminOverviewPage() {
     leadsResult,
     pendingBookingsResult,
     activeBookingsResult,
+    houseResult,
   ] = await Promise.all([
     supabase.rpc("admin_customer_stats"),
     supabase.rpc("admin_list_team"),
@@ -98,6 +156,7 @@ export default async function AdminOverviewPage() {
       .from("ad_bookings")
       .select("id", { count: "exact", head: true })
       .in("status", ["confirmed", "running"]),
+    supabase.rpc("house_screens_overview"),
   ]);
 
   const customers = normalizeAdminCustomerStats(statsResult.data);
@@ -132,6 +191,7 @@ export default async function AdminOverviewPage() {
   const customersWithoutManager = customers.filter(
     (customer) => !customer.manager_id,
   ).length;
+  const houseCounts = countHousePlaying(houseResult.data);
 
   const statCards: AdminStatCardProps[] = [
     {
@@ -183,6 +243,20 @@ export default async function AdminOverviewPage() {
       accent: "text-emerald-300",
     },
     {
+      label: "Screens with nothing playing",
+      value: String(houseCounts.none),
+      icon: MonitorOff,
+      accent: "text-amber-300",
+      href: "/admin/house?playing=none",
+    },
+    {
+      label: "Showing company content",
+      value: String(houseCounts.house),
+      icon: MonitorPlay,
+      accent: "text-sky-300",
+      href: "/admin/house",
+    },
+    {
       label: "Media files",
       value: String(totalMedia),
       icon: Images,
@@ -203,6 +277,7 @@ export default async function AdminOverviewPage() {
     leadsResult.error?.message ??
     pendingBookingsResult.error?.message ??
     activeBookingsResult.error?.message ??
+    houseResult.error?.message ??
     null;
 
   return (

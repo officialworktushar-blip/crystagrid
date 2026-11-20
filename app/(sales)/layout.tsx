@@ -4,7 +4,7 @@ import PanelShell from "@/components/panels/PanelShell";
 import { requireRole } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Sales Manager · Crystagrid",
+  title: "Sales Manager - Crystagrid",
 };
 
 export default async function SalesLayout({
@@ -28,6 +28,7 @@ export default async function SalesLayout({
         { href: "/sales/bookings", label: "Bookings", icon: "bookings" },
         { href: "/sales/leads", label: "Leads", icon: "leads" },
         { href: "/sales/screens", label: "Screens", icon: "screens" },
+        { href: "/sales/house", label: "Company content", icon: "house" },
       ]}
     >
       {children}

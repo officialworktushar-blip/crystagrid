@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
+  Megaphone,
   Monitor,
   Package,
   Tag,
@@ -43,6 +44,7 @@ const navGroups: NavGroup[] = [
       { label: "Team", href: "/admin/team", icon: UsersRound },
       { label: "Leads", href: "/admin/leads", icon: Inbox },
       { label: "Screens", href: "/admin/screens", icon: Monitor },
+      { label: "Company content", href: "/admin/house", icon: Megaphone },
     ],
   },
   {

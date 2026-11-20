@@ -364,21 +364,38 @@ function EmptySlotCard({
 }
 
 function formatUsageDateRange(usage: PlaylistBookingUsage) {
-  const start = formatBookingDate(usage.startDate);
-  const end = formatBookingDate(usage.endDate);
-
-  if (start === "—" && end === "—") {
+  if (!usage.startDate && !usage.endDate) {
     return "Dates not set";
   }
+
+  const start = usage.startDate ? formatBookingDate(usage.startDate) : "";
+  const end = usage.endDate ? formatBookingDate(usage.endDate) : "";
 
   if (start === end) {
     return start;
   }
 
-  return `${start} – ${end}`;
+  return `${start} - ${end}`;
 }
 
-function BookingUsageCard({ usages }: { usages: PlaylistBookingUsage[] }) {
+function BookingUsageCard({
+  usages,
+  assignHint,
+}: {
+  usages: PlaylistBookingUsage[];
+  assignHint?: string;
+}) {
+  if (assignHint) {
+    return (
+      <Card className="flex flex-col overflow-hidden p-0">
+        <div className="border-b border-white/5 px-4 py-4">
+          <h2 className="text-sm font-semibold text-white">Where it plays</h2>
+          <p className="mt-1 text-xs leading-5 text-muted">{assignHint}</p>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="flex flex-col overflow-hidden p-0">
       <div className="border-b border-white/5 px-4 py-4">
@@ -431,6 +448,7 @@ export default function PlaylistEditor({
   canEdit,
   backHref,
   hideScreenAssign,
+  assignHint,
   bookingUsages = [],
 }: {
   playlist: Playlist;
@@ -442,6 +460,7 @@ export default function PlaylistEditor({
   canEdit: boolean;
   backHref: string;
   hideScreenAssign?: boolean;
+  assignHint?: string;
   bookingUsages?: PlaylistBookingUsage[];
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -1146,7 +1165,7 @@ export default function PlaylistEditor({
               </h1>
             )}
             <p className="mt-1 text-xs text-muted">
-              {sortedItems.length} of {MAX_SLOTS} slots · Loop{" "}
+              {sortedItems.length} of {MAX_SLOTS} slots | Loop{" "}
               {formatLoopTime(loopSeconds)}
             </p>
           </div>
@@ -1302,7 +1321,7 @@ export default function PlaylistEditor({
         </Card>
 
         {hideScreenAssign ? (
-          <BookingUsageCard usages={bookingUsages} />
+          <BookingUsageCard usages={bookingUsages} assignHint={assignHint} />
         ) : (
           <Card className="flex flex-col overflow-hidden p-0">
             <div className="border-b border-white/5 px-4 py-4">
@@ -1321,7 +1340,7 @@ export default function PlaylistEditor({
                 <p className="text-sm text-body">
                   {canEdit
                     ? "Pair a screen before assigning a playlist."
-                    : "This playlist is not assigned to any screen."}
+                    : "This playlist is not assigned to a screen."}
                 </p>
                 {canEdit ? (
                   <Link
@@ -1365,7 +1384,7 @@ export default function PlaylistEditor({
                           </div>
                           <p className="mt-0.5 truncate text-xs text-muted">
                             {online ? "Online" : "Offline"}
-                            {screen.location ? ` · ${screen.location}` : ""}
+                            {screen.location ? ` | ${screen.location}` : ""}
                           </p>
                           {otherPlaylistName ? (
                             <p className="mt-1.5 text-xs leading-5 text-amber-300/90">

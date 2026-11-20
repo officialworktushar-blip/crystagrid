@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   LogOut,
   MapPin,
+  Megaphone,
   Menu,
   Monitor,
   Package,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 type NavIcon =
   | "overview"
   | "customers"
+  | "house"
   | "places"
   | "properties"
   | "packages"
@@ -43,6 +45,7 @@ type NavItem = {
 const NAV_ICONS = {
   overview: LayoutDashboard,
   customers: Users,
+  house: Megaphone,
   places: MapPin,
   properties: Building2,
   packages: Package,

@@ -238,7 +238,7 @@ export async function PricingSection({ eyebrow = "Admin" }: { eyebrow?: string }
     supabase
       .from("ad_settings")
       .select(
-        "id, online_discount_pct, gst_pct, platinum_multiplier, max_total_discount_pct",
+        "id, online_discount_pct, gst_pct, platinum_multiplier, max_total_discount_pct, company_state_code",
       )
       .eq("id", 1)
       .maybeSingle(),
@@ -264,12 +264,20 @@ export async function PricingSection({ eyebrow = "Admin" }: { eyebrow?: string }
   );
 }
 
-export async function BookingsSection({ eyebrow = "Admin" }: { eyebrow?: string }) {
+export async function BookingsSection({
+  eyebrow = "Admin",
+  canViewBilling = true,
+}: {
+  eyebrow?: string;
+  canViewBilling?: boolean;
+}) {
   const supabase = await createClient();
   const [bookingsResult, citiesResult] = await Promise.all([
     supabase
       .from("ad_bookings")
-      .select("*, profiles(full_name, company_name), ad_booking_items(*)")
+      .select(
+        "*, profiles(full_name, company_name), ad_booking_items(*)",
+      )
       .order("created_at", { ascending: false }),
     supabase
       .from("ad_cities")
@@ -289,6 +297,7 @@ export async function BookingsSection({ eyebrow = "Admin" }: { eyebrow?: string 
         bookings={normalizeAdBookings(bookingsResult.data)}
         cities={(citiesResult.data ?? []) as unknown as AdCity[]}
         loadError={firstError(bookingsResult.error, citiesResult.error)}
+        canViewBilling={canViewBilling}
       />
     </div>
   );

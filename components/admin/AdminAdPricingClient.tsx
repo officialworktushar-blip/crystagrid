@@ -13,6 +13,7 @@ import Card from "@/components/ui/Card";
 import type { AdPromoCode, AdSettings } from "@/lib/ads";
 import { DEFAULT_AD_SETTINGS } from "@/lib/ads";
 import { formatAdminDate } from "@/lib/admin";
+import { GST_STATES } from "@/lib/gst";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ type SettingsDraft = {
   gst_pct: string;
   platinum_multiplier: string;
   max_total_discount_pct: string;
+  company_state_code: string;
 };
 
 type PromoDraft = {
@@ -46,6 +48,7 @@ function settingsDraft(settings: AdSettings | null): SettingsDraft {
     gst_pct: String(value.gst_pct),
     platinum_multiplier: String(value.platinum_multiplier),
     max_total_discount_pct: String(value.max_total_discount_pct),
+    company_state_code: value.company_state_code ?? "",
   };
 }
 
@@ -178,6 +181,7 @@ export default function AdminAdPricingClient({
       0,
       95,
     );
+    const companyStateCode = draft.company_state_code.trim();
 
     if (onlineDiscount === null) {
       setSettingsError(
@@ -205,6 +209,11 @@ export default function AdminAdPricingClient({
       return;
     }
 
+    if (companyStateCode && !/^\d{2}$/.test(companyStateCode)) {
+      setSettingsError("Company GST state must be a valid 2-digit code.");
+      return;
+    }
+
     setPending("settings-save");
     setSettingsError(null);
     setNotice(null);
@@ -216,6 +225,7 @@ export default function AdminAdPricingClient({
         gst_pct: gst,
         platinum_multiplier: platinumMultiplier,
         max_total_discount_pct: maxTotalDiscount,
+        company_state_code: companyStateCode || null,
       })
       .eq("id", 1)
       .select("id");
@@ -552,6 +562,37 @@ export default function AdminAdPricingClient({
               <p className="mt-1 text-xs text-muted">
                 Caps the combined online and promo discounts on a
                 booking.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="company-state-code"
+                className="mb-1 block text-xs text-muted"
+              >
+                Company GST state
+              </label>
+              <select
+                id="company-state-code"
+                value={draft.company_state_code}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    company_state_code: event.target.value,
+                  }))
+                }
+                className={inputClass}
+              >
+                <option value="">Select state</option>
+                {Object.entries(GST_STATES).map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {name} ({code})
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted">
+                Decides whether customers see CGST + SGST (same state) or IGST.
+                Use the state of your GST registration.
               </p>
             </div>
           </div>

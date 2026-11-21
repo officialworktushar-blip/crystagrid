@@ -1,11 +1,14 @@
 import Link from "next/link";
 import {
+  AlertCircle,
   ArrowRight,
   CalendarCheck,
   CalendarClock,
+  CreditCard,
   HardDrive,
   Images,
   Inbox,
+  IndianRupee,
   Monitor,
   MonitorOff,
   MonitorPlay,
@@ -24,6 +27,7 @@ import {
   normalizeAdminCustomerStats,
   normalizeAdminTeam,
 } from "@/lib/admin";
+import { formatINR } from "@/lib/ads";
 import {
   formatRelativeTime,
   isOnline,
@@ -138,6 +142,9 @@ export default async function AdminOverviewPage() {
     pendingBookingsResult,
     activeBookingsResult,
     houseResult,
+    paidBookingsResult,
+    revenueResult,
+    unmatchedPaymentsResult,
   ] = await Promise.all([
     supabase.rpc("admin_customer_stats"),
     supabase.rpc("admin_list_team"),
@@ -157,6 +164,15 @@ export default async function AdminOverviewPage() {
       .select("id", { count: "exact", head: true })
       .in("status", ["confirmed", "running"]),
     supabase.rpc("house_screens_overview"),
+    supabase
+      .from("ad_bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("payment_status", "paid"),
+    supabase.from("ad_bookings").select("total").eq("payment_status", "paid"),
+    supabase
+      .from("ad_payments")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "unmatched"),
   ]);
 
   const customers = normalizeAdminCustomerStats(statsResult.data);
@@ -192,6 +208,10 @@ export default async function AdminOverviewPage() {
     (customer) => !customer.manager_id,
   ).length;
   const houseCounts = countHousePlaying(houseResult.data);
+  const revenueCollected = (revenueResult.data ?? []).reduce((sum, row) => {
+    const total = (row as { total?: unknown }).total;
+    return sum + (typeof total === "number" && Number.isFinite(total) ? total : 0);
+  }, 0);
 
   const statCards: AdminStatCardProps[] = [
     {
@@ -229,6 +249,27 @@ export default async function AdminOverviewPage() {
       value: String(activeBookingsResult.count ?? 0),
       icon: CalendarCheck,
       accent: "text-emerald-300",
+    },
+    {
+      label: "Paid bookings",
+      value: String(paidBookingsResult.count ?? 0),
+      icon: CreditCard,
+      accent: "text-emerald-300",
+      href: "/admin/payments",
+    },
+    {
+      label: "Revenue collected",
+      value: formatINR(revenueCollected),
+      icon: IndianRupee,
+      accent: "text-emerald-300",
+      href: "/admin/payments",
+    },
+    {
+      label: "Payments to check",
+      value: String(unmatchedPaymentsResult.count ?? 0),
+      icon: AlertCircle,
+      accent: "text-amber-300",
+      href: "/admin/payments",
     },
     {
       label: "Total screens",
@@ -278,6 +319,9 @@ export default async function AdminOverviewPage() {
     pendingBookingsResult.error?.message ??
     activeBookingsResult.error?.message ??
     houseResult.error?.message ??
+    paidBookingsResult.error?.message ??
+    revenueResult.error?.message ??
+    unmatchedPaymentsResult.error?.message ??
     null;
 
   return (

@@ -579,6 +579,16 @@ export default function CmCustomerBookingsClient({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusChip status={booking.status} />
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                      (booking.paymentStatus ?? "").toLowerCase() === "paid"
+                        ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                        : "border-white/10 bg-white/5 text-white/60",
+                    )}
+                  >
+                    {(booking.paymentStatus ?? "").toLowerCase() === "paid" ? "Paid" : "Unpaid"}
+                  </span>
                   <DateStateChip booking={booking} />
                   {needsContent ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-300">

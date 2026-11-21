@@ -10,6 +10,9 @@ import {
   ArrowRight,
   CalendarDays,
   ClipboardList,
+  CreditCard,
+  ExternalLink,
+  FileText,
   Loader2,
   Monitor,
   ReceiptText,
@@ -35,6 +38,7 @@ import {
 import { formatAdminDate } from "@/lib/admin";
 import type { AdCity } from "@/lib/ads";
 import { formatINR, todayIST } from "@/lib/ads";
+import { GST_STATES } from "@/lib/gst";
 import { formatRelativeTime } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -58,11 +62,50 @@ type BookingFilters = {
   city: string;
   tier: string;
   item: string;
+  payment: string;
   dateFrom: string;
   dateTo: string;
   needsContent: boolean;
   liveNow: boolean;
   showDrafts: boolean;
+  unpaidOnly: boolean;
+};
+
+type BookingPayment = {
+  id: string;
+  amountPaise: number;
+  status: string;
+  method: string | null;
+  razorpayPaymentId: string | null;
+  razorpayOrderId: string | null;
+  createdAt: string | null;
+};
+
+type BookingBilling = {
+  customerType: string | null;
+  legalName: string | null;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  stateCode: string | null;
+  pincode: string | null;
+  gstin: string | null;
+  pan: string | null;
+  gstType: string | null;
+  cgst: number | null;
+  sgst: number | null;
+  igst: number | null;
+};
+
+type BookingDetailsState = {
+  bookingId: string;
+  loading: boolean;
+  error: string | null;
+  billing: BookingBilling | null;
+  payments: BookingPayment[];
 };
 
 const emptyFilters: BookingFilters = {
@@ -71,11 +114,13 @@ const emptyFilters: BookingFilters = {
   city: "",
   tier: "",
   item: "",
+  payment: "",
   dateFrom: "",
   dateTo: "",
   needsContent: false,
   liveNow: false,
   showDrafts: false,
+  unpaidOnly: false,
 };
 
 const inputClass =
@@ -113,6 +158,13 @@ const statusStyles: Record<
   },
 };
 
+const paymentStyles: Record<string, string> = {
+  paid: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
+  unpaid: "border-white/10 bg-white/5 text-white/60",
+  failed: "border-red-400/20 bg-red-400/10 text-red-300",
+  refunded: "border-amber-400/20 bg-amber-400/10 text-amber-300",
+};
+
 function BookingStatusBadge({ status }: { status: string }) {
   const normalized = status.trim().toLowerCase();
   const style = statusStyles[normalized] ?? statusStyles.draft;
@@ -128,6 +180,137 @@ function BookingStatusBadge({ status }: { status: string }) {
       {formatBookingStatus(status)}
     </span>
   );
+}
+
+function PaymentStatusBadge({ status }: { status: string | null }) {
+  const normalized = status?.trim().toLowerCase() || "unpaid";
+  const label =
+    normalized === "paid"
+      ? "Paid"
+      : normalized === "failed"
+        ? "Failed"
+        : normalized === "refunded"
+          ? "Refunded"
+          : "Unpaid";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+        paymentStyles[normalized] ?? paymentStyles.unpaid,
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function pickRecordString(
+  row: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function pickRecordNumber(
+  row: Record<string, unknown>,
+  keys: string[],
+): number | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function normalizeBookingBilling(value: unknown): BookingBilling | null {
+  const row = asRecord(value);
+  if (!row) {
+    return null;
+  }
+  return {
+    customerType: pickRecordString(row, ["customer_type"]),
+    legalName: pickRecordString(row, ["legal_name"]),
+    contactName: pickRecordString(row, ["contact_name"]),
+    email: pickRecordString(row, ["email"]),
+    phone: pickRecordString(row, ["phone"]),
+    addressLine1: pickRecordString(row, ["address_line1"]),
+    addressLine2: pickRecordString(row, ["address_line2"]),
+    city: pickRecordString(row, ["city"]),
+    stateCode: pickRecordString(row, ["state_code"]),
+    pincode: pickRecordString(row, ["pincode"]),
+    gstin: pickRecordString(row, ["gstin"]),
+    pan: pickRecordString(row, ["pan"]),
+    gstType: pickRecordString(row, ["gst_type"]),
+    cgst: pickRecordNumber(row, ["cgst"]),
+    sgst: pickRecordNumber(row, ["sgst"]),
+    igst: pickRecordNumber(row, ["igst"]),
+  };
+}
+
+function normalizeBookingPayments(value: unknown): BookingPayment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((entry) => {
+    const row = asRecord(entry);
+    const id = row ? pickRecordString(row, ["id"]) : null;
+    if (!row || !id) {
+      return [];
+    }
+    return [
+      {
+        id,
+        amountPaise: Math.max(
+          0,
+          Math.round(pickRecordNumber(row, ["amount_paise"]) ?? 0),
+        ),
+        status: pickRecordString(row, ["status"])?.toLowerCase() ?? "unknown",
+        method: pickRecordString(row, ["method"]),
+        razorpayPaymentId: pickRecordString(row, ["razorpay_payment_id"]),
+        razorpayOrderId: pickRecordString(row, ["razorpay_order_id"]),
+        createdAt: pickRecordString(row, ["created_at"]),
+      },
+    ];
+  });
+}
+
+function formatGstState(stateCode: string | null): string {
+  if (!stateCode) {
+    return "�?" ;
+  }
+  const trimmed = stateCode.trim();
+  const name = GST_STATES[trimmed];
+  return name ? `${name} (${trimmed})` : trimmed;
+}
+
+function paymentMethodLabel(method: string | null): string {
+  if (!method) {
+    return "�?" ;
+  }
+  return method
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function itemFilterValue(item: AdBookingItem): string | null {
@@ -202,10 +385,12 @@ export default function AdminAdBookingsClient({
   bookings: initialBookings,
   cities,
   loadError,
+  canViewBilling = true,
 }: {
   bookings: AdBooking[];
   cities: AdCity[];
   loadError: string | null;
+  canViewBilling?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const { filters, set, clear } = useFilters(emptyFilters);
@@ -219,6 +404,8 @@ export default function AdminAdBookingsClient({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [screensState, setScreensState] =
     useState<BookingScreensState | null>(null);
+  const [detailsState, setDetailsState] =
+    useState<BookingDetailsState | null>(null);
 
   const cityOptions = useMemo(() => {
     const names = new Set<string>();
@@ -322,6 +509,17 @@ export default function AdminAdBookingsClient({
           return false;
         }
 
+        const paymentStatus =
+          booking.paymentStatus?.trim().toLowerCase() || "unpaid";
+
+        if (filters.payment && paymentStatus !== filters.payment) {
+          return false;
+        }
+
+        if (filters.unpaidOnly && paymentStatus === "paid") {
+          return false;
+        }
+
         const startDate = booking.startDate?.slice(0, 10) ?? "";
 
         if (filters.dateFrom && (!startDate || startDate < filters.dateFrom)) {
@@ -403,6 +601,7 @@ export default function AdminAdBookingsClient({
   useEffect(() => {
     if (!selectedId) {
       setScreensState(null);
+      setDetailsState(null);
       return;
     }
 
@@ -413,6 +612,13 @@ export default function AdminAdBookingsClient({
       loading: true,
       error: null,
       screens: [],
+    });
+    setDetailsState({
+      bookingId: selectedId,
+      loading: true,
+      error: null,
+      billing: null,
+      payments: [],
     });
 
     void supabase
@@ -440,10 +646,51 @@ export default function AdminAdBookingsClient({
         });
       });
 
+    void (async () => {
+      const paymentResult = await supabase
+        .from("ad_payments")
+        .select(
+          "id, amount_paise, status, method, razorpay_payment_id, razorpay_order_id, created_at",
+        )
+        .eq("booking_id", selectedId)
+        .order("created_at", { ascending: false });
+
+      let billing: BookingBilling | null = null;
+      let billingError: string | null = null;
+
+      if (canViewBilling) {
+        const billingResult = await supabase
+          .from("ad_booking_billing")
+          .select(
+            "customer_type, legal_name, contact_name, email, phone, address_line1, address_line2, city, state_code, pincode, gstin, pan, gst_type, cgst, sgst, igst",
+          )
+          .eq("booking_id", selectedId)
+          .maybeSingle();
+        billing = normalizeBookingBilling(billingResult.data);
+        billingError = billingResult.error?.message ?? null;
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      const error = [paymentResult.error?.message, billingError]
+        .filter((value): value is string => Boolean(value))
+        .join(" ");
+
+      setDetailsState({
+        bookingId: selectedId,
+        loading: false,
+        error: error || null,
+        billing,
+        payments: normalizeBookingPayments(paymentResult.data),
+      });
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [selectedId, supabase]);
+  }, [canViewBilling, selectedId, supabase]);
 
   useEffect(() => {
     if (!selected) {
@@ -584,6 +831,18 @@ export default function AdminAdBookingsClient({
             })),
           },
           {
+            key: "payment",
+            label: "Payment",
+            value: filters.payment,
+            onChange: (value) => set("payment", value),
+            options: [
+              { value: "paid", label: "Paid" },
+              { value: "unpaid", label: "Unpaid" },
+              { value: "failed", label: "Failed" },
+              { value: "refunded", label: "Refunded" },
+            ],
+          },
+          {
             key: "city",
             label: "City",
             value: filters.city,
@@ -606,6 +865,12 @@ export default function AdminAdBookingsClient({
           },
         ]}
         toggles={[
+          {
+            key: "unpaidOnly",
+            label: "Unpaid only",
+            checked: filters.unpaidOnly,
+            onChange: (value) => set("unpaidOnly", value),
+          },
           {
             key: "needsContent",
             label: "Needs content",
@@ -702,6 +967,9 @@ export default function AdminAdBookingsClient({
                     Status
                   </th>
                   <th scope="col" className="px-4 py-3 font-semibold">
+                    Payment
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     Content
                   </th>
                   <th
@@ -767,6 +1035,9 @@ export default function AdminAdBookingsClient({
                       <BookingStatusBadge status={booking.status} />
                     </td>
                     <td className="px-4 py-3.5">
+                      <PaymentStatusBadge status={booking.paymentStatus} />
+                    </td>
+                    <td className="px-4 py-3.5">
                       <ContentChip hasContent={booking.hasContent} />
                     </td>
                     <td className="px-5 py-3.5 text-right">
@@ -803,6 +1074,7 @@ export default function AdminAdBookingsClient({
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     <BookingStatusBadge status={booking.status} />
+                    <PaymentStatusBadge status={booking.paymentStatus} />
                     <ContentChip hasContent={booking.hasContent} />
                   </div>
                 </div>
@@ -884,9 +1156,10 @@ export default function AdminAdBookingsClient({
                 </h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <BookingStatusBadge status={selected.status} />
+                  <PaymentStatusBadge status={selected.paymentStatus} />
                   <ContentChip hasContent={selected.hasContent} />
                   <span className="text-xs text-muted">
-                    {selected.companyName || "No company"} ·{" "}
+                    {selected.companyName || "No company"} A�{" "}
                     {formatAdminDate(selected.createdAt)}
                   </span>
                 </div>
@@ -1059,6 +1332,143 @@ export default function AdminAdBookingsClient({
                   </div>
                 )}
               </section>
+
+              <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                <div className="flex items-center gap-2">
+                  <CreditCard
+                    aria-hidden="true"
+                    className="h-4 w-4 text-brand-sky"
+                  />
+                  <h3 className="text-sm font-semibold text-white">Payment</h3>
+                </div>
+                {(() => {
+                  const details =
+                    detailsState?.bookingId === selected.id ? detailsState : null;
+                  const latestPayment = details?.payments[0] ?? null;
+                  const paymentId =
+                    latestPayment?.razorpayPaymentId ?? selected.razorpayPaymentId;
+                  const method = latestPayment?.method ?? null;
+                  const amountPaise = latestPayment?.amountPaise ?? null;
+
+                  return (
+                    <dl className="mt-4 space-y-2.5 text-sm">
+                      {details?.loading ? (
+                        <p className="text-xs text-muted">Loading payment...</p>
+                      ) : details?.error ? (
+                        <p role="alert" className="text-xs text-red-300">
+                          {details.error}
+                        </p>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-body">Status</dt>
+                        <dd>
+                          <PaymentStatusBadge status={selected.paymentStatus} />
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-body">Paid date</dt>
+                        <dd className="text-white/80">
+                          {selected.paidAt ? formatAdminDate(selected.paidAt) : "�?"}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-body">Amount</dt>
+                        <dd className="text-white/80 tabular-nums">
+                          {amountPaise !== null
+                            ? formatINR(amountPaise / 100)
+                            : formatINR(selected.total)}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <dt className="text-body">Method</dt>
+                        <dd className="text-white/80">{paymentMethodLabel(method)}</dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <dt className="text-body">Payment ID</dt>
+                        <dd className="text-right text-white/80">
+                          {paymentId ? (
+                            <div className="space-y-1">
+                              <p className="font-mono text-xs break-all">{paymentId}</p>
+                              <a
+                                href={`https://dashboard.razorpay.com/app/payments/${encodeURIComponent(paymentId)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-brand-sky transition hover:text-white"
+                              >
+                                Open in Razorpay
+                                <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                              </a>
+                            </div>
+                          ) : (
+                            "�?" 
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                  );
+                })()}
+              </section>
+
+              {canViewBilling ? (
+                <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="flex items-center gap-2">
+                    <FileText
+                      aria-hidden="true"
+                      className="h-4 w-4 text-brand-sky"
+                    />
+                    <h3 className="text-sm font-semibold text-white">
+                      Billing details
+                    </h3>
+                  </div>
+                  {(() => {
+                    const details =
+                      detailsState?.bookingId === selected.id ? detailsState : null;
+                    const billing = details?.billing;
+
+                    if (details?.loading) {
+                      return <p className="mt-4 text-xs text-muted">Loading billing...</p>;
+                    }
+                    if (details?.error && !details.billing) {
+                      return (
+                        <p role="alert" className="mt-4 text-xs text-red-300">
+                          {details.error}
+                        </p>
+                      );
+                    }
+                    if (!billing) {
+                      return (
+                        <p className="mt-4 text-sm text-body">
+                          No billing details available.
+                        </p>
+                      );
+                    }
+
+                    const address = [
+                      billing.addressLine1,
+                      billing.addressLine2,
+                      billing.city,
+                      formatGstState(billing.stateCode),
+                      billing.pincode,
+                    ]
+                      .filter((value): value is string => Boolean(value?.trim()))
+                      .join(", ");
+
+                    return (
+                      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                        <div><dt className="text-xs text-muted">Type</dt><dd className="text-white/80">{billing.customerType || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">Legal name</dt><dd className="text-white/80">{billing.legalName || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">Contact person</dt><dd className="text-white/80">{billing.contactName || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">Email</dt><dd className="text-white/80 break-all">{billing.email || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">Phone</dt><dd className="text-white/80">{billing.phone || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">GSTIN</dt><dd className="font-mono text-xs text-white/80 break-all">{billing.gstin || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">PAN</dt><dd className="font-mono text-xs text-white/80">{billing.pan || "�?"}</dd></div>
+                        <div><dt className="text-xs text-muted">Tax split</dt><dd className="text-white/80">{billing.gstType?.toLowerCase() === "igst" ? `IGST ${formatINR(billing.igst ?? 0)}` : `CGST ${formatINR(billing.cgst ?? 0)} / SGST ${formatINR(billing.sgst ?? 0)}`}</dd></div>
+                        <div className="sm:col-span-2"><dt className="text-xs text-muted">Address</dt><dd className="text-white/80">{address || "�?"}</dd></div>
+                      </dl>
+                    );
+                  })()}
+                </section>
+              ) : null}
 
               <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
                 <div className="flex items-center gap-2">

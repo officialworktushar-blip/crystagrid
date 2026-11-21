@@ -95,6 +95,7 @@ export interface AdSettings {
   gst_pct: number;
   platinum_multiplier: number;
   max_total_discount_pct: number;
+  company_state_code: string | null;
 }
 
 export interface AdPromoCode {
@@ -159,6 +160,7 @@ export const DEFAULT_AD_SETTINGS: AdSettings = {
   gst_pct: 0,
   platinum_multiplier: 1,
   max_total_discount_pct: 0,
+  company_state_code: null,
 };
 
 const inrFormatter = new Intl.NumberFormat("en-IN", {

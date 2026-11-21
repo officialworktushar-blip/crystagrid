@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Building2,
   CalendarCheck,
+  CreditCard,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
   {
     items: [
       { label: "Bookings", href: "/admin/bookings", icon: CalendarCheck },
+      { label: "Payments", href: "/admin/payments", icon: CreditCard },
     ],
   },
   {

@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   Building2,
   CalendarCheck,
+  CreditCard,
   Inbox,
   LayoutDashboard,
   LayoutGrid,
@@ -33,6 +34,7 @@ type NavIcon =
   | "packages"
   | "pricing"
   | "bookings"
+  | "payments"
   | "leads"
   | "screens";
 
@@ -51,6 +53,7 @@ const NAV_ICONS = {
   packages: Package,
   pricing: Tags,
   bookings: CalendarCheck,
+  payments: CreditCard,
   leads: Inbox,
   screens: Monitor,
 } satisfies Record<NavIcon, LucideIcon>;

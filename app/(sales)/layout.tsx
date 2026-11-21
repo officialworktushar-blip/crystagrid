@@ -26,6 +26,7 @@ export default async function SalesLayout({
         { href: "/sales/packages", label: "Packages", icon: "packages" },
         { href: "/sales/pricing", label: "Pricing & Promo", icon: "pricing" },
         { href: "/sales/bookings", label: "Bookings", icon: "bookings" },
+        { href: "/sales/payments", label: "Payments", icon: "payments" },
         { href: "/sales/leads", label: "Leads", icon: "leads" },
         { href: "/sales/screens", label: "Screens", icon: "screens" },
         { href: "/sales/house", label: "Company content", icon: "house" },

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import {
+  AlertCircle,
   ArrowRight,
   Building2,
   CalendarCheck,
   CalendarClock,
+  CreditCard,
+  IndianRupee,
   Inbox,
   Monitor,
   MonitorOff,
@@ -129,6 +132,9 @@ export default async function SalesOverview() {
     propertyStatsResult,
     newestPendingResult,
     houseResult,
+    paidBookingsResult,
+    revenueResult,
+    unmatchedPaymentsResult,
   ] = await Promise.all([
     supabase
       .from("ad_bookings")
@@ -161,6 +167,15 @@ export default async function SalesOverview() {
       .order("created_at", { ascending: false })
       .limit(5),
     supabase.rpc("house_screens_overview"),
+    supabase
+      .from("ad_bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("payment_status", "paid"),
+    supabase.from("ad_bookings").select("total").eq("payment_status", "paid"),
+    supabase
+      .from("ad_payments")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "unmatched"),
   ]);
 
   const screens = normalizeStaffScreens(screensResult.data);
@@ -170,6 +185,10 @@ export default async function SalesOverview() {
   ).length;
   const pendingBookings = normalizeAdBookings(newestPendingResult.data);
   const houseCounts = countHousePlaying(houseResult.data);
+  const revenueCollected = (revenueResult.data ?? []).reduce((sum, row) => {
+    const total = (row as { total?: unknown }).total;
+    return sum + (typeof total === "number" && Number.isFinite(total) ? total : 0);
+  }, 0);
   const loadErrorMessage =
     pendingResult.error?.message ??
     activeResult.error?.message ??
@@ -180,6 +199,9 @@ export default async function SalesOverview() {
     propertyStatsResult.error?.message ??
     newestPendingResult.error?.message ??
     houseResult.error?.message ??
+    paidBookingsResult.error?.message ??
+    revenueResult.error?.message ??
+    unmatchedPaymentsResult.error?.message ??
     null;
 
   const statCards: SalesStatCardProps[] = [
@@ -196,6 +218,27 @@ export default async function SalesOverview() {
       icon: CalendarCheck,
       accent: "text-emerald-300",
       href: "/sales/bookings",
+    },
+    {
+      label: "Paid bookings",
+      value: String(paidBookingsResult.count ?? 0),
+      icon: CreditCard,
+      accent: "text-emerald-300",
+      href: "/sales/payments",
+    },
+    {
+      label: "Revenue collected",
+      value: formatINR(revenueCollected),
+      icon: IndianRupee,
+      accent: "text-emerald-300",
+      href: "/sales/payments",
+    },
+    {
+      label: "Payments to check",
+      value: String(unmatchedPaymentsResult.count ?? 0),
+      icon: AlertCircle,
+      accent: "text-amber-300",
+      href: "/sales/payments",
     },
     {
       label: "New leads - 7 days",

@@ -46,6 +46,8 @@ export interface AdBooking {
   total: number;
   status: string;
   paymentStatus: string | null;
+  paidAt: string | null;
+  razorpayPaymentId: string | null;
   adminNotes: string;
   createdAt: string | null;
   playlistId: string | null;
@@ -399,6 +401,11 @@ export function normalizeAdBooking(value: unknown): AdBooking | null {
     "pending";
   const paymentStatus =
     pickString(row, ["payment_status", "paymentStatus"])?.toLowerCase() ?? null;
+  const paidAt = pickString(row, ["paid_at", "paidAt"]);
+  const razorpayPaymentId = pickString(row, [
+    "razorpay_payment_id",
+    "razorpayPaymentId",
+  ]);
   const playlistId =
     pickString(row, [
       "playlist_id",
@@ -483,6 +490,8 @@ export function normalizeAdBooking(value: unknown): AdBooking | null {
       ]) ?? 0,
     status,
     paymentStatus,
+    paidAt,
+    razorpayPaymentId,
     adminNotes:
       pickString(row, [
         "admin_notes",

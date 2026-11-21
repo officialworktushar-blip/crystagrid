@@ -74,6 +74,22 @@ function StatusChip({ status }: { status: string }) {
   );
 }
 
+function PaymentChip({ status }: { status: string | null }) {
+  const paid = (status ?? "").toLowerCase() === "paid";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+        paid
+          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+          : "border-white/10 bg-white/5 text-white/60",
+      )}
+    >
+      {paid ? "Paid" : "Unpaid"}
+    </span>
+  );
+}
+
 function ContentFlags({ booking }: { booking: CmBooking }) {
   const needsContent = cmBookingNeedsContent(booking);
   const live = isCmBookingLive(booking);
@@ -343,6 +359,7 @@ export default function CmBookingsClient({
                   <th className="px-5 py-3.5">City</th>
                   <th className="px-5 py-3.5">Dates</th>
                   <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Payment</th>
                   <th className="px-5 py-3.5">Flags</th>
                   <th className="px-5 py-3.5 text-right">Total</th>
                   <th className="px-5 py-3.5 text-right">Action</th>
@@ -389,6 +406,9 @@ export default function CmBookingsClient({
                       <StatusChip status={booking.status} />
                     </td>
                     <td className="px-5 py-4">
+                      <PaymentChip status={booking.paymentStatus} />
+                    </td>
+                    <td className="px-5 py-4">
                       <ContentFlags booking={booking} />
                     </td>
                     <td className="px-5 py-4 text-right font-semibold tabular-nums text-white">
@@ -425,7 +445,10 @@ export default function CmBookingsClient({
                       {formatBookingId(booking.id)}
                     </p>
                   </div>
-                  <StatusChip status={booking.status} />
+                  <div className="flex flex-col items-end gap-1.5">
+                    <StatusChip status={booking.status} />
+                    <PaymentChip status={booking.paymentStatus} />
+                  </div>
                 </div>
 
                 <p className="mt-3 text-sm text-white/80">

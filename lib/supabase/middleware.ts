@@ -52,6 +52,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api/payments")) {
+    return supabaseResponse;
+  }
   const isDashboardRoute =
     pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   const isAdminRoute =

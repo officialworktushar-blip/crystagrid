@@ -584,9 +584,9 @@ export default function AdminAdPricingClient({
                 className={inputClass}
               >
                 <option value="">Select state</option>
-                {Object.entries(GST_STATES).map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {name} ({code})
+                {GST_STATES.map((state) => (
+                  <option key={state.code} value={state.code}>
+                    {state.name} ({state.code})
                   </option>
                 ))}
               </select>

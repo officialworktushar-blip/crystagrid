@@ -43,6 +43,22 @@ export const GST_STATES: GstState[] = [
   { code: "97", name: "Other Territory" },
 ];
 
+export function stateNameByCode(code: string | null | undefined): string {
+  if (!code) {
+    return "";
+  }
+  const found = GST_STATES.find((state) => state.code === code);
+  return found ? found.name : "";
+}
+
+export function stateLabel(code: string | null | undefined): string {
+  if (!code) {
+    return "";
+  }
+  const name = stateNameByCode(code);
+  return name ? `${name} (${code})` : code;
+}
+
 export function normalizeId(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }

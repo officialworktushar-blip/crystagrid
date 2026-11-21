@@ -38,7 +38,7 @@ import {
 import { formatAdminDate } from "@/lib/admin";
 import type { AdCity } from "@/lib/ads";
 import { formatINR, todayIST } from "@/lib/ads";
-import { GST_STATES } from "@/lib/gst";
+import { stateLabel } from "@/lib/gst";
 import { formatRelativeTime } from "@/lib/screens";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -295,13 +295,12 @@ function normalizeBookingPayments(value: unknown): BookingPayment[] {
   });
 }
 
-function formatGstState(stateCode: string | null): string {
+function formatGstState(stateCode: string | null | undefined): string {
   if (!stateCode) {
-    return "�?" ;
+    return "-";
   }
   const trimmed = stateCode.trim();
-  const name = GST_STATES[trimmed];
-  return name ? `${name} (${trimmed})` : trimmed;
+  return trimmed ? stateLabel(trimmed) : "-";
 }
 
 function paymentMethodLabel(method: string | null): string {

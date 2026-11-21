@@ -45,6 +45,7 @@ export interface AdBooking {
   roundingAmount: number;
   total: number;
   status: string;
+  paymentStatus: string | null;
   adminNotes: string;
   createdAt: string | null;
   playlistId: string | null;
@@ -396,6 +397,8 @@ export function normalizeAdBooking(value: unknown): AdBooking | null {
   const status =
     pickString(row, ["status", "booking_status", "state"])?.toLowerCase() ??
     "pending";
+  const paymentStatus =
+    pickString(row, ["payment_status", "paymentStatus"])?.toLowerCase() ?? null;
   const playlistId =
     pickString(row, [
       "playlist_id",
@@ -479,6 +482,7 @@ export function normalizeAdBooking(value: unknown): AdBooking | null {
         "total_inr",
       ]) ?? 0,
     status,
+    paymentStatus,
     adminNotes:
       pickString(row, [
         "admin_notes",

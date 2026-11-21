@@ -857,7 +857,7 @@ export default function BookingPlanClient() {
         p_days: draft.days,
         p_tier: draft.tier,
         p_promo: draft.promo.trim() || null,
-        p_submit: submit,
+        p_submit: false,
       });
 
       if (error) {
@@ -876,15 +876,15 @@ export default function BookingPlanClient() {
         setQuote(result.quote);
       }
 
-      if (submit) {
-        clearBookingDraft();
-        router.push(`/book/done/${result.id}`);
-        return;
-      }
-
       const nextDraft = { ...draft, bookingId: result.id };
       setDraft(nextDraft);
       saveBookingDraft(nextDraft);
+
+      if (submit) {
+        router.push(`/book/checkout?booking=${result.id}`);
+        return;
+      }
+
       setSavedMessage("Saved. Find it in My Plans.");
     } catch {
       setActionError("Something went wrong while saving your booking.");
@@ -1522,8 +1522,7 @@ export default function BookingPlanClient() {
       </div>
 
       <p className="mt-4 text-center text-[11px] font-medium text-[#94a3b8]">
-        No payment is collected at this stage. Our team will confirm your
-        booking first.
+        You will review billing details and pay securely on the next step.
       </p>
     </div>
   );

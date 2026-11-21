@@ -130,14 +130,11 @@ export default function MyPlansClient({
         const createdLabel = booking.createdAt
           ? `Created ${formatBookingDate(booking.createdAt)}`
           : "Created date pending";
+        const isDraft = status === "draft";
+        const isPaid = (booking.paymentStatus ?? "").toLowerCase() === "paid";
 
         return (
-          <Link
-            key={booking.id}
-            href={`/dashboard/plans/${booking.id}`}
-            aria-label={`View booking ${formatBookingId(booking.id)} details`}
-            className="block rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
-          >
+          <div key={booking.id} className="rounded-3xl">
             <Card className="h-full overflow-hidden p-0 hover:border-sky-500/40 hover:shadow-card">
               <div className="border-b border-white/5 px-5 py-5 sm:px-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -151,15 +148,22 @@ export default function MyPlansClient({
                     </h2>
                     <p className="mt-1 text-xs text-white/35">{createdLabel}</p>
                   </div>
-                  <span
-                    className={cn(
-                      "inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize",
-                      STATUS_STYLES[status] ??
-                        "border-white/10 bg-white/5 text-white/60",
-                    )}
-                  >
-                    {formatBookingStatus(booking.status)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isPaid ? (
+                      <span className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+                        Paid
+                      </span>
+                    ) : null}
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize",
+                        STATUS_STYLES[status] ??
+                          "border-white/10 bg-white/5 text-white/60",
+                      )}
+                    >
+                      {formatBookingStatus(booking.status)}
+                    </span>
+                  </div>
                 </div>
 
                 <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -235,13 +239,34 @@ export default function MyPlansClient({
                   )}
                 </div>
 
-                <p className="flex items-center justify-end gap-2 text-xs font-semibold text-sky-300">
-                  View booking details
-                  <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
-                </p>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {isDraft && !isPaid ? (
+                    <Link
+                      href={`/book/checkout?booking=${booking.id}`}
+                      className="inline-flex h-9 items-center justify-center rounded-full bg-[#1d6fff] px-4 text-xs font-bold text-white transition hover:bg-[#155ee7]"
+                    >
+                      Complete payment
+                    </Link>
+                  ) : null}
+                  {isDraft ? (
+                    <Link
+                      href={`/book/plan?draft=${booking.id}`}
+                      className="inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-xs font-bold text-white/80 transition hover:bg-white/10"
+                    >
+                      Continue
+                    </Link>
+                  ) : null}
+                  <Link
+                    href={`/dashboard/plans/${booking.id}`}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-4 text-xs font-bold text-sky-300 transition hover:bg-white/10"
+                  >
+                    View booking details
+                    <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
             </Card>
-          </Link>
+          </div>
         );
       })}
     </div>

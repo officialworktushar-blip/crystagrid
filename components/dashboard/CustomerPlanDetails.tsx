@@ -147,6 +147,11 @@ function PlanHeader({ booking }: { booking: CmBooking }) {
               Your campaign
             </h2>
             <StatusChip status={booking.status} />
+            {(booking.paymentStatus ?? "").toLowerCase() === "paid" ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                Paid
+              </span>
+            ) : null}
             {live ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
@@ -161,6 +166,11 @@ function PlanHeader({ booking }: { booking: CmBooking }) {
             <span className="font-semibold text-white">
               {formatINR(booking.total)}
             </span>
+            {(booking.paymentStatus ?? "").toLowerCase() === "paid" ? (
+              <a href={`/book/done/${booking.id}`} className="font-semibold text-sky-300 hover:text-sky-200">
+                Receipt
+              </a>
+            ) : null}
           </div>
         </div>
 

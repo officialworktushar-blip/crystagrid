@@ -8,19 +8,19 @@ import Container from "@/components/ui/Container";
 
 const steps = [
   {
-    title: "Pair your screen",
+    title: "Connect Your Screen",
     description:
-      "Open the player and enter the 6-digit code shown in your dashboard.",
+      "Pair your Android-powered display using a simple 6-digit activation code. Connect your screen to your CrystaGrid dashboard in minutes.",
   },
   {
-    title: "Upload your media",
+    title: "Upload Your Content",
     description:
-      "Add images and videos to one shared library, ready for any screen.",
+      "Build your media library with images and videos. Organize your advertising creatives and keep everything ready for publishing.",
   },
   {
-    title: "Publish a playlist",
+    title: "Publish & Manage",
     description:
-      "Assign it to any screen and it updates live, instantly.",
+      "Create playlists, assign content to individual screens, and push updates in real time. Manage your connected displays from anywhere.",
   },
 ];
 
@@ -45,20 +45,26 @@ export default function HowItWorks() {
             </p>
 
             <h2 className="mt-4 text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl">
-              Go live in{" "}
-              <span className="text-brand-gradient">5 minutes</span>.
+              Your screens. Your campaigns.{" "}
+              <span className="text-brand-gradient">One platform.</span>
             </h2>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-body sm:text-lg">
-              Pair a screen, add your media, and publish a playlist from one
-              simple dashboard. No hardware, no installs, no learning curve.
+              Launch and manage your digital advertising screens without
+              complicated setups. Connect your display, upload your creative
+              content, and publish campaigns through one centralized dashboard.
+            </p>
+
+            <p className="mt-4 max-w-xl text-base leading-7 text-body sm:text-lg">
+              No complex configurations. No manual content transfers. Just a
+              simpler way to manage digital screens.
             </p>
 
             <div className="mt-8 space-y-5">
               {steps.map((step, index) => (
                 <div key={step.title} className="flex gap-4">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sky-400/30 bg-sky-400/10 text-sm font-semibold text-sky-400">
-                    {index + 1}
+                    {String(index + 1).padStart(2, "0")}
                   </span>
                   <div>
                     <h3 className="font-semibold text-white">{step.title}</h3>

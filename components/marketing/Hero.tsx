@@ -26,8 +26,9 @@ export default function Hero() {
         </h1>
 
         <p className="mt-6 max-w-3xl text-balance text-lg leading-8 text-white/70 sm:text-xl lg:text-2xl">
-          Upload media, build playlists, and publish to every screen in real
-          time — all from one powerful dashboard.
+          From residential communities and commercial spaces to caf&eacute;s,
+          retail stores, and public venues, CrystaGrid transforms everyday
+          locations into powerful digital advertising opportunities.
         </p>
 
         <div className="mt-8 flex w-full flex-col items-center justify-center gap-4 sm:w-auto sm:flex-row">

@@ -1,10 +1,13 @@
 "use client";
 
 import Image, { type StaticImageData } from "next/image";
-import atiraVertical from "../../public/Atira_Veritcal.webp";
 import cafeVertical from "../../public/Cafe_Vertical.webp";
 import tatvanVertical from "../../public/Tatvan_Vertical.webp";
-import taryaVertical from "../../public/Tarya_Vertical.webp";
+import viewCar from "../../public/View_Car.webp";
+import viewFit from "../../public/View_Fit.webp";
+import viewFreshMart from "../../public/View_FreshMart.webp";
+import viewRS from "../../public/View_RS.webp";
+import viewTarya from "../../public/View_Tarya.webp";
 import {
   motion,
   useAnimationFrame,
@@ -65,15 +68,15 @@ const SCREEN_COLOR = "#060b18";
 
 const HERO_IMAGES = [
   tatvanVertical,
-  atiraVertical,
-  taryaVertical,
+  viewRS,
+  viewTarya,
+  viewCar,
+  viewFreshMart,
+  viewFit,
   cafeVertical,
 ] as const;
 
-const SCREENS: ScreenCreative[] = Array.from(
-  { length: FRAME_COUNT },
-  (_, index) => ({ image: HERO_IMAGES[index % HERO_IMAGES.length] }),
-);
+const SCREENS: ScreenCreative[] = HERO_IMAGES.map((image) => ({ image }));
 
 function hexToRgb(hex: string): [number, number, number] {
   const value = hex.replace("#", "");

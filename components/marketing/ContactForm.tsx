@@ -137,7 +137,7 @@ export default function ContactForm() {
 
       if (insertError) {
         setError(
-          "We couldn't send your message. Please try again or email hello@crystagrid.com.",
+          "We couldn't send your message. Please try again or email connect@crystagrid.com.",
         );
         return;
       }
@@ -145,7 +145,7 @@ export default function ContactForm() {
       setSubmitted(true);
     } catch {
       setError(
-        "We couldn't send your message. Please try again or email hello@crystagrid.com.",
+        "We couldn't send your message. Please try again or email connect@crystagrid.com.",
       );
     } finally {
       submittingRef.current = false;

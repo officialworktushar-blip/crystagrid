@@ -8,40 +8,27 @@ export default function TopStrip() {
     <div className="hidden h-[42px] border-b border-white/10 md:block">
       <div className="mx-auto flex h-full w-full max-w-[1540px] items-center justify-between gap-6 px-6 text-sm text-white/80">
         <Link
-          href="mailto:hello@crystagrid.com"
+          href="mailto:connect@crystagrid.com"
           className="transition duration-200 hover:text-white"
         >
-          hello@crystagrid.com
+          connect@crystagrid.com
         </Link>
 
         <div className="flex items-center gap-4">
           <Link
-            href="tel:+910000000000"
+            href="tel:+918679995253"
             className="transition duration-200 hover:text-white"
           >
-            +91 00000 00000
+            8679995253
           </Link>
 
           <div className="flex items-center gap-2">
             <Link
-              href="#"
-              aria-label="LinkedIn"
-              className={iconLinkClass}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-3.5 w-3.5"
-              >
-                <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM10 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.5c0-1.31-.02-3-1.83-3-1.84 0-2.12 1.43-2.12 2.9V21h-4z" />
-              </svg>
-            </Link>
-
-            <Link
-              href="#"
+              href="https://www.instagram.com/crystagrid?dmpr=MWpuM2sxb2M4NWIwcg=="
               aria-label="Instagram"
               className={iconLinkClass}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <svg
                 aria-hidden="true"

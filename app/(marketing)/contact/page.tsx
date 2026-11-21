@@ -38,7 +38,7 @@ export default function ContactPage() {
 
             <div className="mt-8 space-y-3">
               <a
-                href="mailto:hello@crystagrid.com"
+                href="mailto:connect@crystagrid.com"
                 className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 transition duration-200 hover:border-sky-500/40 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-brand-sky">
@@ -49,13 +49,13 @@ export default function ContactPage() {
                     Email
                   </span>
                   <span className="mt-0.5 block truncate text-sm font-semibold text-white">
-                    hello@crystagrid.com
+                    connect@crystagrid.com
                   </span>
                 </span>
               </a>
 
               <a
-                href="tel:+910000000000"
+                href="tel:+918679995253"
                 className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 transition duration-200 hover:border-sky-500/40 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-brand-sky">
@@ -66,7 +66,7 @@ export default function ContactPage() {
                     Phone
                   </span>
                   <span className="mt-0.5 block truncate text-sm font-semibold text-white">
-                    +91 00000 00000
+                    8679995253
                   </span>
                 </span>
               </a>

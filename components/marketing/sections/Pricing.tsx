@@ -21,7 +21,7 @@ const PLANS = [
       "Live screen status",
     ],
     highlighted: false,
-    cta: { label: "Start Free", href: "/register" },
+    cta: { label: "Book CrystaGrid Ads", href: "/register" },
   },
   {
     name: "Growth",
@@ -34,7 +34,7 @@ const PLANS = [
       "Live screen status",
     ],
     highlighted: true,
-    cta: { label: "Start Free", href: "/register" },
+    cta: { label: "Book CrystaGrid Ads", href: "/register" },
   },
   {
     name: "Business",

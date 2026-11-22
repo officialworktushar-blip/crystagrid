@@ -77,7 +77,7 @@ export default function HowItWorks() {
             </div>
 
             <Button asChild className="mt-8">
-              <Link href="/register">Start Free</Link>
+              <Link href="/register">Book CrystaGrid Ads</Link>
             </Button>
           </div>
 

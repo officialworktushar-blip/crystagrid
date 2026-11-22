@@ -19,7 +19,7 @@ export default function Hero() {
 
       <OrbitScreens />
 
-      <div className="relative z-[3] mx-auto flex w-full max-w-5xl flex-col items-center pt-[calc(136px_+_3.6rem)] text-center md:pt-[calc(178px_+_3.6rem)]">
+      <div className="relative z-[3] mx-auto flex w-full max-w-5xl flex-col items-center pt-[136px] text-center md:pt-[178px]">
         <h1 className="max-w-5xl text-balance text-[clamp(2.75rem,6vw,5.5rem)] font-extrabold leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_24px_rgba(2,6,23,0.85)]">
           <span className="text-[0.75em]">Uttrakhand First Ambient DOOH</span>{" "}
           <span className="text-brand-gradient">Advertising Network</span>

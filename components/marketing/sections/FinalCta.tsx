@@ -17,7 +17,7 @@ export default function FinalCta() {
 
           <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button asChild className="h-14 w-full px-8 text-lg sm:w-auto">
-              <Link href="/register">Start Free →</Link>
+              <Link href="/register">Book CrystaGrid Ads →</Link>
             </Button>
             <Button
               asChild

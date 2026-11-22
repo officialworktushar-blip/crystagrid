@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <section className="pb-24 pt-48 sm:pt-56">
+    <section className="pb-24 pt-[136px] sm:pt-[168px]">
       <Container>
         <SectionHeading
           eyebrow="Contact"

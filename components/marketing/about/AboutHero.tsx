@@ -106,7 +106,7 @@ export default function AboutHero() {
       };
 
   return (
-    <section className="relative overflow-hidden pb-24 pt-44 md:pt-52">
+    <section className="relative overflow-hidden pb-24 pt-[120px] md:pt-[152px]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"

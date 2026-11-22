@@ -302,6 +302,7 @@ function clipPolygon(
 export function voronoiCells(
   sites: ProjectedPoint[],
   bounds: BBox,
+  clip?: Point2D[],
 ): { id: string; polygon: Point2D[]; path: string }[] {
   const input = Array.isArray(sites) ? sites : [];
   const bx = bounds && Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) &&
@@ -315,7 +316,9 @@ export function voronoiCells(
     [bx.maxX, bx.maxY],
     [bx.minX, bx.maxY],
   ].filter(isPoint);
-  if (rect.length < 3) {
+  const clipRing = (Array.isArray(clip) ? clip : []).filter(isPoint);
+  const region = clipRing.length >= 3 ? clipRing : rect;
+  if (region.length < 3) {
     return input.map((s) => ({ id: s && typeof s.id === "string" ? s.id : "", polygon: [], path: "" }));
   }
 
@@ -338,7 +341,7 @@ export function voronoiCells(
   }
 
   const computed = adjusted.map((si) => {
-    let cell = rect.slice();
+    let cell = region.slice();
     for (const sj of adjusted) {
       if (si.id === sj.id) continue;
       const a = sj.x - si.x;
@@ -379,13 +382,30 @@ function rectsOverlap(a: Rect, b: Rect): boolean {
   return !(a.x2 < b.x1 || a.x1 > b.x2 || a.y2 < b.y1 || a.y1 > b.y2);
 }
 
-export function placeLabels(sites: LabelSite[], fontSize: number): PlacedLabel[] {
+export function placeLabels(
+  sites: LabelSite[],
+  fontSize: number,
+  viewW?: number,
+  viewH?: number,
+): PlacedLabel[] {
   const valid = (Array.isArray(sites) ? sites : []).filter(
     (s) => s && Number.isFinite(s.x) && Number.isFinite(s.y) && typeof s.id === "string",
   );
   if (valid.length === 0) return [];
 
   const size = Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 13;
+  let maxX = 0;
+  let maxY = 0;
+  for (const s of valid) {
+    if (s.x + 220 > maxX) maxX = s.x + 220;
+    if (s.y + 60 > maxY) maxY = s.y + 60;
+  }
+  const viewWidth =
+    typeof viewW === "number" && Number.isFinite(viewW) && viewW > 0 ? viewW : Math.max(720, maxX);
+  const viewHeight =
+    typeof viewH === "number" && Number.isFinite(viewH) && viewH > 0 ? viewH : Math.max(520, maxY);
+  const insideView = (r: Rect) =>
+    r.x1 >= -0.5 && r.y1 >= -0.5 && r.x2 <= viewWidth + 0.5 && r.y2 <= viewHeight + 0.5;
   const ordered = valid
     .map((s, i) => ({ ...s, index: i }))
     .sort((a, b) => (a.major === b.major ? a.index - b.index : a.major ? -1 : 1));
@@ -435,21 +455,64 @@ export function placeLabels(sites: LabelSite[], fontSize: number): PlacedLabel[]
     ];
 
     let chosen = candidates[0];
+    let found = false;
     for (const cand of candidates) {
+      if (!insideView(cand.rect)) continue;
       const bad =
         placedRects.some((r) => rectsOverlap(cand.rect, r)) ||
         dotRects.some((r) => rectsOverlap(cand.rect, r));
       if (!bad) {
         chosen = cand;
+        found = true;
         break;
       }
     }
+    if (!found) {
+      for (const cand of candidates) {
+        if (!insideView(cand.rect)) continue;
+        chosen = cand;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      let bestScore = Infinity;
+      for (const cand of candidates) {
+        const overlap =
+          placedRects.filter((r) => rectsOverlap(cand.rect, r)).length +
+          dotRects.filter((r) => rectsOverlap(cand.rect, r)).length;
+        const outside =
+          Math.max(0, -cand.rect.x1) +
+          Math.max(0, cand.rect.x2 - viewWidth) +
+          Math.max(0, -cand.rect.y1) +
+          Math.max(0, cand.rect.y2 - viewHeight);
+        const score = overlap * 1000 + outside;
+        if (score < bestScore) {
+          bestScore = score;
+          chosen = cand;
+        }
+      }
+    }
 
-    placedRects.push(chosen.rect);
+    const rect = chosen.rect;
+    let shiftX = 0;
+    let shiftY = 0;
+    if (rect.x1 < 2) shiftX = 2 - rect.x1;
+    else if (rect.x2 > viewWidth - 2) shiftX = viewWidth - 2 - rect.x2;
+    if (rect.y1 < 2) shiftY = 2 - rect.y1;
+    else if (rect.y2 > viewHeight - 2) shiftY = viewHeight - 2 - rect.y2;
+    const finalX = chosen.x + shiftX;
+    const finalY = chosen.y + shiftY;
+    placedRects.push({
+      x1: rect.x1 + shiftX,
+      y1: rect.y1 + shiftY,
+      x2: rect.x2 + shiftX,
+      y2: rect.y2 + shiftY,
+    });
     result.set(site.id, {
       id: site.id,
-      x: chosen.x,
-      y: chosen.y,
+      x: finalX,
+      y: finalY,
       anchor: chosen.anchor,
       dy: chosen.dy,
     });
@@ -464,4 +527,393 @@ export function placeLabels(sites: LabelSite[], fontSize: number): PlacedLabel[]
       dy: size * 0.35,
     },
   );
+}
+
+export type LatLng = [number, number];
+
+export type MercatorPoint = { x: number; y: number };
+
+export function mercator(lat: number, lng: number): MercatorPoint {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { x: 0, y: 0 };
+  const clamped = Math.max(-85.05112878, Math.min(85.05112878, lat));
+  const rad = (clamped * Math.PI) / 180;
+  const x = (lng * Math.PI) / 180;
+  const y = Math.log(Math.tan(Math.PI / 4 + rad / 2));
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : { x: 0, y: 0 };
+}
+
+export function inverseMercator(x: number, y: number): LatLng {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return [0, 0];
+  const lng = (x * 180) / Math.PI;
+  const lat = (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * (180 / Math.PI);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : [0, 0];
+}
+
+export const mercatorInverse = inverseMercator;
+
+function isLatLng(p: unknown): p is LatLng {
+  return (
+    Array.isArray(p) &&
+    p.length >= 2 &&
+    Number.isFinite(p[0]) &&
+    Number.isFinite(p[1])
+  );
+}
+
+function samePoint(a: Point2D, b: Point2D): boolean {
+  return Math.abs(a[0] - b[0]) < 1e-12 && Math.abs(a[1] - b[1]) < 1e-12;
+}
+
+function distanceToSegment(p: Point2D, a: Point2D, b: Point2D): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  if (!(lenSq > 0)) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+  const t = Math.max(
+    0,
+    Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq),
+  );
+  const cx = a[0] + t * dx;
+  const cy = a[1] + t * dy;
+  return Math.hypot(p[0] - cx, p[1] - cy);
+}
+
+function douglasPeuckerKeep(points: Point2D[], tolerance: number): boolean[] {
+  const keep = new Array<boolean>(points.length).fill(false);
+  if (points.length === 0) return keep;
+  keep[0] = true;
+  keep[points.length - 1] = true;
+  const stack: [number, number][] = [[0, points.length - 1]];
+  while (stack.length > 0) {
+    const segment = stack.pop();
+    if (!segment) break;
+    const start = segment[0];
+    const end = segment[1];
+    if (end - start <= 1) continue;
+    let maxDistance = -1;
+    let split = -1;
+    for (let i = start + 1; i < end; i++) {
+      const distance = distanceToSegment(points[i], points[start], points[end]);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        split = i;
+      }
+    }
+    if (split >= 0 && maxDistance > tolerance) {
+      keep[split] = true;
+      stack.push([start, split], [split, end]);
+    }
+  }
+  return keep;
+}
+
+export function simplifyRing(points: Point2D[], maxPoints: number): Point2D[] {
+  const input = (Array.isArray(points) ? points : []).filter(isPoint);
+  const limit = Number.isFinite(maxPoints) ? Math.floor(maxPoints) : 250;
+  if (input.length < 3 || limit < 3) return input.slice();
+  if (input.length <= limit) return input.slice();
+
+  const closed =
+    samePoint(input[0], input[input.length - 1]);
+  const open = closed ? input.slice(0, -1) : input.slice();
+  if (open.length < 3) return input.slice();
+
+  const target = closed ? limit - 1 : limit;
+  const box = bboxOf(open);
+  const span = Math.max(box.maxX - box.minX, box.maxY - box.minY, MIN_SPAN);
+  let low = 0;
+  let high = span;
+  let best = douglasPeuckerKeep(open, high);
+  for (let iteration = 0; iteration < 28; iteration++) {
+    const mid = (low + high) / 2;
+    const keep = douglasPeuckerKeep(open, mid);
+    const count = keep.reduce((sum, value) => sum + (value ? 1 : 0), 0);
+    if (count <= target) {
+      best = keep;
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+
+  let result = open.filter((_, index) => best[index]);
+  if (result.length > target) {
+    const step = Math.ceil(open.length / target);
+    result = open.filter((_, index) => index % step === 0);
+    if (result.length > target) result = result.slice(0, target);
+    if (result.length > 0) result[result.length - 1] = open[open.length - 1];
+  }
+  if (result.length < 3) return input.slice(0, limit);
+  if (closed) result.push([result[0][0], result[0][1]]);
+  return result;
+}
+
+function chaikinClosed(points: Point2D[]): Point2D[] {
+  const ring = points.filter(isPoint);
+  if (ring.length < 3) return ring;
+  const output: Point2D[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    output.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]]);
+    output.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]]);
+  }
+  return output;
+}
+
+export type Projector = {
+  viewW: number;
+  viewH: number;
+  project: (lat: number, lng: number) => Point2D;
+  unproject: (x: number, y: number) => LatLng;
+  polygon: Point2D[];
+  path: string;
+  bbox: BBox;
+};
+
+function emptyProjector(viewW: number, viewH: number): Projector {
+  const width = Number.isFinite(viewW) && viewW > 0 ? viewW : 720;
+  const height = Number.isFinite(viewH) && viewH > 0 ? viewH : 520;
+  return {
+    viewW: width,
+    viewH: height,
+    project: () => [0, 0],
+    unproject: () => [0, 0],
+    polygon: [],
+    path: "",
+    bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+  };
+}
+
+export function makeProjector(
+  outline: LatLng[],
+  viewW = 720,
+  margin = 40,
+  extraPoints: LatLng[] = [],
+): Projector {
+  const w = Number.isFinite(viewW) && viewW > 0 ? viewW : 720;
+  const m = Number.isFinite(margin) && margin >= 0 ? Math.min(margin, w / 2 - 1) : 40;
+  const fallback = emptyProjector(w, 2 * m + 200);
+  const ring = (Array.isArray(outline) ? outline : []).filter(isLatLng);
+  if (ring.length < 3) return fallback;
+
+  const asXY: Point2D[] = ring.map((p) => [p[0], p[1]]);
+  const reduced = asXY.length > 250 ? simplifyRing(asXY, 250) : asXY;
+  const projected = reduced
+    .map((p) => mercator(p[0], p[1]))
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  if (projected.length < 3) return fallback;
+
+  const extras = (Array.isArray(extraPoints) ? extraPoints : [])
+    .filter(isLatLng)
+    .map((p) => mercator(p[0], p[1]))
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  const all = projected.concat(extras);
+  const box = bboxOf(all.map((p) => [p.x, p.y] as Point2D));
+  const spanX = Math.max(box.maxX - box.minX, MIN_SPAN);
+  const spanY = Math.max(box.maxY - box.minY, MIN_SPAN);
+  const innerW = Math.max(w - 2 * m, 1);
+  const scale = innerW / spanX;
+  const viewH = spanY * scale + 2 * m;
+  if (!Number.isFinite(scale) || !Number.isFinite(viewH) || scale <= 0) return fallback;
+
+  const toView = (p: MercatorPoint): Point2D => [
+    m + (p.x - box.minX) * scale,
+    m + (box.maxY - p.y) * scale,
+  ];
+  const polygon = projected.map(toView).filter(isPoint);
+  if (polygon.length < 3) return fallback;
+  if (polygon.length > 1 && samePoint(polygon[0], polygon[polygon.length - 1])) polygon.pop();
+  const path = polygonToPath(chaikinClosed(polygon));
+  if (!path) return fallback;
+
+  return {
+    viewW: w,
+    viewH,
+    project: (lat: number, lng: number) => toView(mercator(lat, lng)),
+    unproject: (x: number, y: number) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return [0, 0];
+      const mx = box.minX + (x - m) / scale;
+      const my = box.maxY - (y - m) / scale;
+      return inverseMercator(mx, my);
+    },
+    polygon,
+    path,
+    bbox: bboxOf(polygon),
+  };
+}
+
+export function pointInPolygon(
+  p: Point2D | null | undefined,
+  polygon: Point2D[],
+): boolean {
+  if (!isPoint(p)) return false;
+  const ring = (Array.isArray(polygon) ? polygon : []).filter(isPoint);
+  if (ring.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if ((a[1] > p[1]) !== (b[1] > p[1])) {
+      const crossing = ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0];
+      if (p[0] < crossing) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+export function nearestPointOnPolygon(
+  p: Point2D | null | undefined,
+  polygon: Point2D[],
+): Point2D {
+  if (!isPoint(p)) return [0, 0];
+  const ring = (Array.isArray(polygon) ? polygon : []).filter(isPoint);
+  if (ring.length === 0) return [p[0], p[1]];
+  let best: Point2D = [ring[0][0], ring[0][1]];
+  let bestDistance = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const lenSq = dx * dx + dy * dy;
+    const t = lenSq > 0
+      ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq))
+      : 0;
+    const q: Point2D = [a[0] + t * dx, a[1] + t * dy];
+    const distance = (p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]);
+    if (Number.isFinite(distance) && distance < bestDistance) {
+      bestDistance = distance;
+      best = q;
+    }
+  }
+  return best;
+}
+
+function distanceToPolygon(p: Point2D, polygon: Point2D[]): number {
+  const q = nearestPointOnPolygon(p, polygon);
+  return Math.hypot(p[0] - q[0], p[1] - q[1]);
+}
+
+export function insetInside(
+  p: Point2D | null | undefined,
+  polygon: Point2D[],
+  insetPx = 14,
+): Point2D {
+  if (!isPoint(p)) return [0, 0];
+  const ring = (Array.isArray(polygon) ? polygon : []).filter(isPoint);
+  if (ring.length < 3) return [p[0], p[1]];
+  const inset = Number.isFinite(insetPx) && insetPx >= 0 ? insetPx : 14;
+  if (pointInPolygon(p, ring) && distanceToPolygon(p, ring) >= inset) {
+    return [p[0], p[1]];
+  }
+
+  const nearest = nearestPointOnPolygon(p, ring);
+  const vx = p[0] - nearest[0];
+  const vy = p[1] - nearest[1];
+  const length = Math.hypot(vx, vy);
+  const offsets: Point2D[] = [];
+  if (length > 1e-9) {
+    offsets.push([-(vx / length) * inset, -(vy / length) * inset]);
+    offsets.push([(vx / length) * inset, (vy / length) * inset]);
+  }
+  const radii = [inset, inset * 1.5, inset * 2.5, inset * 4];
+  for (const radius of radii) {
+    for (let k = 0; k < 16; k++) {
+      const angle = (k / 16) * Math.PI * 2;
+      offsets.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+    }
+  }
+
+  let bestInside: Point2D | null = null;
+  let bestDistance = -1;
+  for (const offset of offsets) {
+    const candidate: Point2D = [nearest[0] + offset[0], nearest[1] + offset[1]];
+    if (!isPoint(candidate) || !pointInPolygon(candidate, ring)) continue;
+    const distance = distanceToPolygon(candidate, ring);
+    if (distance >= inset * 0.95) return candidate;
+    if (distance > bestDistance) {
+      bestDistance = distance;
+      bestInside = candidate;
+    }
+  }
+  if (bestInside !== null) return bestInside;
+  if (pointInPolygon(p, ring)) return [p[0], p[1]];
+
+  let cx = 0;
+  let cy = 0;
+  for (const vertex of ring) {
+    cx += vertex[0];
+    cy += vertex[1];
+  }
+  cx /= ring.length;
+  cy /= ring.length;
+  const centre: Point2D = [cx, cy];
+  return pointInPolygon(centre, ring) ? centre : nearest;
+}
+
+export type FittedSite<T extends ProjectedPoint> = T & { outside: boolean };
+
+export function fitSitesToOutline<T extends ProjectedPoint>(
+  sites: T[],
+  polygon: Point2D[],
+  insetPx = 14,
+  minSpacing = 16,
+): FittedSite<T>[] {
+  const input = Array.isArray(sites) ? sites : [];
+  const ring = (Array.isArray(polygon) ? polygon : []).filter(isPoint);
+  const inset = Number.isFinite(insetPx) && insetPx >= 0 ? insetPx : 14;
+  const spacing = Number.isFinite(minSpacing) && minSpacing > 0 ? minSpacing : 16;
+
+  const fitted: FittedSite<T>[] = [];
+  for (const site of input) {
+    if (!site || !Number.isFinite(site.x) || !Number.isFinite(site.y)) continue;
+    const p: Point2D = [site.x, site.y];
+    if (ring.length < 3) {
+      fitted.push({ ...site, outside: false });
+      continue;
+    }
+    const outside = !pointInPolygon(p, ring) || distanceToPolygon(p, ring) < inset;
+    const moved = outside ? insetInside(p, ring, inset) : p;
+    fitted.push({ ...site, x: moved[0], y: moved[1], outside });
+  }
+  if (ring.length < 3 || fitted.length < 2) return fitted;
+
+  for (let iteration = 0; iteration < 20; iteration++) {
+    let movedAny = false;
+    for (let i = 0; i < fitted.length; i++) {
+      for (let j = i + 1; j < fitted.length; j++) {
+        const a = fitted[i];
+        const b = fitted[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distance = Math.hypot(dx, dy);
+        if (!Number.isFinite(distance) || distance >= spacing) continue;
+        let ux = 0;
+        let uy = 0;
+        let missing = spacing;
+        if (distance > 1e-9) {
+          ux = dx / distance;
+          uy = dy / distance;
+          missing = spacing - distance;
+        } else {
+          const angle = (((i * 137 + j * 31) % 360) * Math.PI) / 180;
+          ux = Math.cos(angle);
+          uy = Math.sin(angle);
+        }
+        const half = missing / 2;
+        const nextA = insetInside([a.x - ux * half, a.y - uy * half], ring, inset);
+        const nextB = insetInside([b.x + ux * half, b.y + uy * half], ring, inset);
+        a.x = nextA[0];
+        a.y = nextA[1];
+        b.x = nextB[0];
+        b.y = nextB[1];
+        a.outside = a.outside || !pointInPolygon([a.x, a.y], ring);
+        b.outside = b.outside || !pointInPolygon([b.x, b.y], ring);
+        movedAny = true;
+      }
+    }
+    if (!movedAny) break;
+  }
+  return fitted;
 }

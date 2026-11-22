@@ -5,12 +5,16 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_PLACES, type MapPlace } from "@/lib/dehradun-places";
+import { OUTLINE_LATLNG, OUTLINE_SOURCE, OUTLINE_STYLE } from "@/lib/dehradun-outline";
 import {
+  fitSitesToOutline,
+  makeProjector,
   outlinePath,
   placeLabels,
   projectPlaces,
   voronoiCells,
   type BBox,
+  type LatLng,
   type PlacedLabel,
   type ProjectedPoint,
 } from "@/lib/map-geo";
@@ -21,6 +25,144 @@ const VIEWBOX_WIDTH = 720;
 
 function sum(nums: number[]): number {
   return nums.reduce((a, b) => a + b, 0);
+}
+
+type SitePoint = ProjectedPoint & { outside: boolean };
+
+type DebugRow = { id: string; name: string; lat: number; lng: number; outside: boolean };
+
+type MapGeometry = {
+  projection: { points: SitePoint[]; width: number; height: number };
+  radius: number;
+  outline: { path: string; bbox: BBox };
+  cells: ReturnType<typeof voronoiCells>;
+  sitesById: Map<string, SitePoint & { place: MapPlace }>;
+  labelById: Map<string, PlacedLabel>;
+  debugRows: DebugRow[];
+};
+
+function buildOutlineGeometry(
+  outlineRing: LatLng[],
+  validPlaces: MapPlace[],
+): MapGeometry | null {
+  if (outlineRing.length < 3 || validPlaces.length < 2) return null;
+  const extras: LatLng[] = validPlaces.map((p) => [p.lat, p.lng]);
+  const projector = makeProjector(outlineRing, VIEWBOX_WIDTH, 40, extras);
+  const width = projector.viewW;
+  const height = projector.viewH;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || !projector.path) return null;
+  if (projector.polygon.length < 3) return null;
+
+  const fitted = fitSitesToOutline(
+    validPlaces.map((p) => {
+      const pt = projector.project(p.lat, p.lng);
+      return { id: p.id, x: pt[0], y: pt[1] };
+    }),
+    projector.polygon,
+    14,
+    16,
+  );
+  if (fitted.length < 2) return null;
+
+  const placeById = new Map(validPlaces.map((p) => [p.id, p]));
+  const cells = fitted.length >= 3
+    ? voronoiCells(fitted, projector.bbox, projector.polygon)
+    : [];
+  const labelSites = fitted
+    .map((site) => {
+      const pl = placeById.get(site.id);
+      return pl ? { ...site, name: pl.name, major: pl.major } : null;
+    })
+    .filter((site): site is SitePoint & { name: string; major: boolean } => site !== null);
+  const labels = placeLabels(labelSites, 13, width, height);
+
+  const sitesById = new Map<string, SitePoint & { place: MapPlace }>();
+  const debugRows: DebugRow[] = [];
+  for (const site of fitted) {
+    const pl = placeById.get(site.id);
+    if (!pl) continue;
+    sitesById.set(site.id, { ...site, place: pl });
+    debugRows.push({
+      id: site.id,
+      name: pl.name,
+      lat: pl.lat,
+      lng: pl.lng,
+      outside: site.outside,
+    });
+  }
+
+  return {
+    projection: { points: fitted, width, height },
+    radius: 0,
+    outline: { path: projector.path, bbox: projector.bbox },
+    cells,
+    sitesById,
+    labelById: new Map(labels.map((l) => [l.id, l])),
+    debugRows,
+  };
+}
+
+function buildHullGeometry(validPlaces: MapPlace[]): MapGeometry | null {
+  if (validPlaces.length < 2) return null;
+
+  const projection = projectPlaces(
+    validPlaces.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng })),
+    VIEWBOX_WIDTH,
+    70,
+  );
+  if (projection.points.length < 2) return null;
+  if (!Number.isFinite(projection.width) || !Number.isFinite(projection.height)) return null;
+
+  const radius = 0.11 * projection.width;
+  if (!Number.isFinite(radius)) return null;
+  const outline = outlinePath(projection.points, radius);
+  if (!outline.path) return null;
+  const { minX, minY, maxX, maxY } = outline.bbox;
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null;
+
+  const bounds: BBox = {
+    minX: minX - 20,
+    minY: minY - 20,
+    maxX: maxX + 20,
+    maxY: maxY + 20,
+  };
+  const points: SitePoint[] = projection.points.map((p) => ({ ...p, outside: false }));
+  const cells = points.length >= 3 ? voronoiCells(points, bounds) : [];
+
+  const labelSites = points
+    .map((pt) => {
+      const pl = validPlaces.find((p) => p.id === pt.id);
+      return pl ? { ...pt, name: pl.name, major: pl.major } : null;
+    })
+    .filter(
+      (site): site is SitePoint & { name: string; major: boolean } => site !== null,
+    );
+  const labels = placeLabels(labelSites, 13, projection.width, projection.height);
+
+  const sitesById = new Map<string, SitePoint & { place: MapPlace }>();
+  const debugRows: DebugRow[] = [];
+  for (const pt of points) {
+    const pl = validPlaces.find((p) => p.id === pt.id);
+    if (!pl) continue;
+    sitesById.set(pt.id, { ...pt, place: pl });
+    debugRows.push({
+      id: pt.id,
+      name: pl.name,
+      lat: pl.lat,
+      lng: pl.lng,
+      outside: false,
+    });
+  }
+
+  return {
+    projection: { points, width: projection.width, height: projection.height },
+    radius,
+    outline: { path: outline.path, bbox: outline.bbox },
+    cells,
+    sitesById,
+    labelById: new Map(labels.map((l) => [l.id, l])),
+    debugRows,
+  };
 }
 
 function StatTile({
@@ -62,7 +204,16 @@ export default function DehradunMap() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isTouch, setIsTouch] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [mapDebug, setMapDebug] = useState(false);
   const reduce = useReducedMotion();
+
+  useEffect(() => {
+    try {
+      setMapDebug(new URLSearchParams(window.location.search).get("mapdebug") === "1");
+    } catch {
+      setMapDebug(false);
+    }
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(hover: none)");
@@ -178,75 +329,45 @@ export default function DehradunMap() {
 
   const activeId = hoveredId ?? selectedId;
   const activePlace = places.find((p) => p.id === activeId) ?? null;
+  const isDotted = OUTLINE_STYLE === "dotted";
+  const outlineStroke = isDotted ? "#e11d48" : "#1294e0";
+  const outlineStrokeWidth = isDotted ? 2 : 1.6;
+  const outlineDash = isDotted ? "2 5" : undefined;
+  const outlineCap = isDotted ? "round" : undefined;
 
   const totalAreas = places.length + noCoordPlaces.length;
   const totalProperties = sum(places.map((p) => p.propertiesCount));
   const totalScreens = sum(places.map((p) => p.screensCount));
   const totalOnline = sum(places.map((p) => p.onlineCount));
 
-  type MapGeometry = {
-    projection: ReturnType<typeof projectPlaces>;
-    radius: number;
-    outline: ReturnType<typeof outlinePath>;
-    cells: ReturnType<typeof voronoiCells>;
-    sitesById: Map<string, ProjectedPoint & { place: MapPlace }>;
-    labelById: Map<string, PlacedLabel>;
-  };
-
   const geometry = useMemo<MapGeometry | null>(() => {
+    const validPlaces = places.filter(
+      (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng),
+    );
+    if (validPlaces.length < 2) return null;
+
+    const outlineRing: LatLng[] = [];
+    for (const pair of OUTLINE_LATLNG) {
+      if (pair && Number.isFinite(pair[0]) && Number.isFinite(pair[1])) {
+        outlineRing.push([pair[0], pair[1]]);
+      }
+    }
+
+    if (outlineRing.length >= 3) {
+      try {
+        const fromOutline = buildOutlineGeometry(outlineRing, validPlaces);
+        if (fromOutline) return fromOutline;
+      } catch {
+        try {
+          return buildHullGeometry(validPlaces);
+        } catch {
+          return null;
+        }
+      }
+    }
+
     try {
-      const validPlaces = places.filter(
-        (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng),
-      );
-      if (validPlaces.length < 2) return null;
-
-      const projection = projectPlaces(
-        validPlaces.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng })),
-        VIEWBOX_WIDTH,
-        70,
-      );
-      if (projection.points.length < 2) return null;
-      if (!Number.isFinite(projection.width) || !Number.isFinite(projection.height)) {
-        return null;
-      }
-
-      const radius = 0.11 * projection.width;
-      if (!Number.isFinite(radius)) return null;
-
-      const outline = outlinePath(projection.points, radius);
-      if (!outline.path) return null;
-      const { minX, minY, maxX, maxY } = outline.bbox;
-      if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null;
-
-      const bounds: BBox = {
-        minX: minX - 20,
-        minY: minY - 20,
-        maxX: maxX + 20,
-        maxY: maxY + 20,
-      };
-      const cells = projection.points.length >= 3
-        ? voronoiCells(projection.points, bounds)
-        : [];
-
-      const labelSites = projection.points
-        .map((pt) => {
-          const pl = validPlaces.find((p) => p.id === pt.id);
-          return pl ? { ...pt, name: pl.name, major: pl.major } : null;
-        })
-        .filter(
-          (site): site is { id: string; x: number; y: number; name: string; major: boolean } =>
-            site !== null,
-        );
-      const labels = placeLabels(labelSites, 13);
-
-      const sitesById = new Map<string, ProjectedPoint & { place: MapPlace }>();
-      for (const pt of projection.points) {
-        const pl = validPlaces.find((p) => p.id === pt.id);
-        if (pl) sitesById.set(pt.id, { ...pt, place: pl });
-      }
-      const labelById = new Map(labels.map((l) => [l.id, l]));
-
-      return { projection, radius, outline, cells, sitesById, labelById };
+      return buildHullGeometry(validPlaces);
     } catch {
       return null;
     }
@@ -263,7 +384,7 @@ export default function DehradunMap() {
     bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } as BBox,
   };
   const cells = geometry?.cells ?? [];
-  const sitesById = geometry?.sitesById ?? new Map<string, ProjectedPoint & { place: MapPlace }>();
+  const sitesById = geometry?.sitesById ?? new Map<string, SitePoint & { place: MapPlace }>();
   const labelById = geometry?.labelById ?? new Map<string, PlacedLabel>();
 
   const handleCellEnter = (id: string, e: React.PointerEvent<SVGPathElement>) => {
@@ -344,7 +465,7 @@ export default function DehradunMap() {
                 <div className="flex h-full flex-col">
                   <h3 className="text-2xl font-semibold text-[#0b8bc4]">{activePlace.name}</h3>
                   <p className="mt-2 text-base text-[#475569]">
-                    {activePlace.propertiesCount} properties · {activePlace.screensCount} screens
+                    {activePlace.propertiesCount} properties - {activePlace.screensCount} screens
                   </p>
                   <div className="mt-4 flex min-h-[56px] flex-wrap content-start gap-2">
                     {activePills.map((name) => (
@@ -369,7 +490,7 @@ export default function DehradunMap() {
                         background: "linear-gradient(90deg, #0ea5e9 0%, #1d6fff 100%)",
                       }}
                     >
-                      {`Book ads in ${activePlace.name} →`}
+                      {`Book ads in ${activePlace.name} ->`}
                     </Link>
                   </div>
                 </div>
@@ -386,8 +507,11 @@ export default function DehradunMap() {
           <motion.div {...reveal(0.1)} className="order-1 lg:order-2">
             {geometry ? (
             <div
-              className="overflow-hidden rounded-[36px] border border-[#e3e9f2] bg-white p-4 sm:p-6"
-              style={{ boxShadow: "0 30px 80px -30px rgba(14,165,233,0.35)" }}
+              className="overflow-visible rounded-[36px] border border-[#e3e9f2] bg-white p-4 sm:p-6"
+              style={{
+                boxShadow: "0 30px 80px -30px rgba(14,165,233,0.35)",
+                overflow: "visible",
+              }}
             >
               <svg
                 width="100%"
@@ -395,7 +519,8 @@ export default function DehradunMap() {
                 viewBox={`0 0 ${projection.width} ${projection.height}`}
                 role="group"
                 aria-label="Map of Dehradun areas"
-                className="block"
+                className="block overflow-visible"
+                style={{ overflow: "visible" }}
               >
                 <defs>
                   <linearGradient id="land" x1="0" y1="0" x2="0" y2="1">
@@ -413,8 +538,10 @@ export default function DehradunMap() {
                 <path
                   d={outline.path}
                   fill="url(#land)"
-                  stroke="#1294e0"
-                  strokeWidth={1.6}
+                  stroke={outlineStroke}
+                  strokeWidth={outlineStrokeWidth}
+                  strokeDasharray={outlineDash}
+                  strokeLinecap={outlineCap}
                   strokeLinejoin="round"
                   filter="url(#land-shadow)"
                   pointerEvents="none"
@@ -444,8 +571,8 @@ export default function DehradunMap() {
                                   ? "rgba(14,116,198,0.55)"
                                   : "transparent"
                             }
-                            stroke={isSelected ? "#0b6cb8" : "rgba(255,255,255,0.9)"}
-                            strokeWidth={isSelected ? 2 : 1.2}
+                            stroke="rgba(255,255,255,0.9)"
+                            strokeWidth={1.2}
                             style={{
                               transition: reduce ? "none" : "fill 200ms",
                               outline: "none",
@@ -515,8 +642,10 @@ export default function DehradunMap() {
                 <path
                   d={outline.path}
                   fill="none"
-                  stroke="#1294e0"
-                  strokeWidth={1.6}
+                  stroke={outlineStroke}
+                  strokeWidth={outlineStrokeWidth}
+                  strokeDasharray={outlineDash}
+                  strokeLinecap={outlineCap}
                   strokeLinejoin="round"
                   pointerEvents="none"
                 />
@@ -587,6 +716,12 @@ export default function DehradunMap() {
                 </g>
               </svg>
 
+              {OUTLINE_SOURCE === "osm" ? (
+                <p className="mt-2 text-xs text-[#94a3b8]">
+                  Map data: OpenStreetMap contributors
+                </p>
+              ) : null}
+
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#475569]">
                 <span className="inline-flex items-center gap-2">
                   <span className="h-[14px] w-[14px] rounded-full border-2 border-white bg-[#0a7fd8] shadow-sm" />
@@ -602,6 +737,20 @@ export default function DehradunMap() {
                 </span>
               </div>
             </div>
+            ) : null}
+
+            {mapDebug ? (
+              <div className="mt-4 rounded-2xl border border-[#e3e9f2] bg-white p-4 text-xs text-[#475569]">
+                <p className="font-semibold text-[#0f3d5e]">Debug: place coordinates</p>
+                <ul className="mt-2 space-y-1">
+                  {(geometry?.debugRows ?? []).map((row) => (
+                    <li key={row.id}>
+                      {row.name}: {row.lat.toFixed(4)}, {row.lng.toFixed(4)}
+                      {row.outside ? " - outside: moved to the edge" : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="mt-4 flex flex-wrap gap-2">

@@ -160,14 +160,6 @@ export default function Navbar() {
             </Link>
 
             <SolutionsMenu />
-
-            <Link
-              href="#pricing"
-              aria-current={isActive("#pricing") ? "page" : undefined}
-              className={linkClass(isActive("#pricing"))}
-            >
-              Pricing
-            </Link>
           </nav>
         </div>
 
@@ -259,15 +251,6 @@ export default function Navbar() {
                   </Link>
                 ))}
               </div>
-
-              <Link
-                href="#pricing"
-                aria-current={isActive("#pricing") ? "page" : undefined}
-                onClick={() => setMobileOpen(false)}
-                className={mobileLinkClass(isActive("#pricing"))}
-              >
-                Pricing
-              </Link>
             </nav>
 
             <div className="mt-4 border-t border-white/10 pt-4">

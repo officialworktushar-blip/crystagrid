@@ -4,7 +4,20 @@ import { Image as ImageIcon, Video } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-const SLOT_COUNT = 10;
+const SLOT_IMAGES = [
+  "/Floor_Black.webp",
+  "/Board_White.webp",
+  "/Lift_Black.webp",
+  "/Cafe_Vertical.webp",
+  "/Cafe_Horizontal.webp",
+  "/Tarya_Vertical.webp",
+  "/Tatvan_Vertical.webp",
+  "/Atira_Veritcal.webp",
+  "/View_FreshMart.webp",
+  "/View_Fit.webp",
+];
+
+const SLOT_COUNT = SLOT_IMAGES.length;
 
 export default function SlotLoop() {
   const reducedMotion = useReducedMotion();
@@ -48,12 +61,12 @@ export default function SlotLoop() {
           className="mt-14 rounded-[36px] border border-white/10 bg-[#0a1226] p-6 md:p-10"
         >
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {Array.from({ length: SLOT_COUNT }, (_, index) => {
+            {SLOT_IMAGES.map((src, index) => {
               const isActive = !reduce && index === active;
               const Icon = index % 2 === 0 ? ImageIcon : Video;
               return (
                 <motion.div
-                  key={index}
+                  key={src}
                   animate={
                     reduce
                       ? undefined
@@ -63,11 +76,22 @@ export default function SlotLoop() {
                         }
                   }
                   transition={reduce ? undefined : { duration: 0.25 }}
-                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#050b1f] p-4"
+                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#050b1f]"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#0f1b3a]">
+                    <img
+                      src={src}
+                      alt={`Slot ${index + 1} content mockup`}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute left-2 top-2 rounded-full border border-white/15 bg-black/45 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-md">
                       Slot {index + 1}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 pb-1 pt-3">
+                    <span className="text-xs font-medium text-slate-300">
+                      {index % 2 === 0 ? "Image" : "Video"}
                     </span>
                     <Icon
                       aria-hidden="true"
@@ -75,9 +99,7 @@ export default function SlotLoop() {
                       strokeWidth={1.8}
                     />
                   </div>
-                  <div className="mt-4 h-10 rounded-lg border border-white/5 bg-white/[0.03]" />
-                  <div className="mt-2 h-2 w-2/3 rounded-full bg-white/10" />
-                  <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="mx-3 mb-3 mt-2 h-1 overflow-hidden rounded-full bg-white/10">
                     <motion.div
                       className="h-full rounded-full bg-sky-400"
                       animate={reduce ? undefined : { width: isActive ? "100%" : "0%" }}

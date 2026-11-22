@@ -7,7 +7,6 @@ import Faq from "@/components/marketing/sections/Faq";
 import Features from "@/components/marketing/sections/Features";
 import FinalCta from "@/components/marketing/sections/FinalCta";
 import HowItWorks from "@/components/marketing/sections/HowItWorks";
-import Pricing from "@/components/marketing/sections/Pricing";
 import Venues from "@/components/marketing/sections/Venues";
 import WhyCrystagrid from "@/components/marketing/sections/WhyCrystagrid";
 
@@ -28,7 +27,6 @@ export default function MarketingPage() {
       <Venues />
       <WhyCrystagrid />
       <DehradunMap />
-      <Pricing />
       <Faq />
       <FinalCta />
     </>

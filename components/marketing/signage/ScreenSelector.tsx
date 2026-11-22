@@ -1,39 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from "framer-motion";
+import {
+  Building,
   Check,
+  Coffee,
   DoorOpen,
-  PanelBottom,
-  Square,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
-import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import ImageSlot from "@/components/marketing/signage/ImageSlot";
-import PlacementScene from "@/components/marketing/signage/PlacementScene";
 import {
-  COLORS,
-  PLACEMENTS,
-  SCREENS,
-  SHOW_SIZES,
-  imageFor,
-  ratioLabel,
-  type PlacementId,
-} from "@/lib/signage-screens";
-
-const PLACEMENT_ICONS: Record<PlacementId, LucideIcon> = {
-  wall: Square,
-  floor: PanelBottom,
-  lift: DoorOpen,
-};
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import ImageSlot from "@/components/marketing/signage/ImageSlot";
+import { COLORS, SCREENS, imageFor } from "@/lib/signage-screens";
 
 const SCREEN_IDS = SCREENS.map((item) => item.id);
 const COLOUR_IDS = COLORS.map((item) => item.id);
-const PLACEMENT_IDS = PLACEMENTS.map((item) => item.id);
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d6fff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#050b1f]";
+
+const HELPER_ITEMS: { id: string; icon: LucideIcon; text: string }[] = [
+  { id: "floor", icon: Building, text: "Open floor or showroom? Choose Floor." },
+  { id: "board", icon: Coffee, text: "Cafe or shop entrance? Choose Board." },
+  { id: "lift", icon: DoorOpen, text: "Lift lobby or corridor? Choose Lift." },
+];
 
 function moveSelection(
   event: ReactKeyboardEvent<HTMLButtonElement>,
@@ -63,39 +67,63 @@ export default function ScreenSelector() {
   const reduce = Boolean(reducedMotion);
   const [screenId, setScreenId] = useState(SCREENS[0]?.id ?? "");
   const [colourId, setColourId] = useState(COLORS[0]?.id ?? "");
-  const [placementId, setPlacementId] = useState<PlacementId>("wall");
-  const shapeRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [tiltEnabled, setTiltEnabled] = useState(false);
+  const screenRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const colourRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const placementRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+  const rawRotateX = useTransform(pointerY, [-0.5, 0.5], [3, -3]);
+  const rawRotateY = useTransform(pointerX, [-0.5, 0.5], [-3, 3]);
+  const rotateX = useSpring(rawRotateX, { stiffness: 180, damping: 22 });
+  const rotateY = useSpring(rawRotateY, { stiffness: 180, damping: 22 });
+
+  useEffect(() => {
+    SCREENS.forEach((item) => {
+      COLORS.forEach((option) => {
+        const src = imageFor(item, option.id);
+        if (src) {
+          const preload = new Image();
+          preload.src = src;
+        }
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px) and (hover: hover) and (pointer: fine)");
+    const update = () => setTiltEnabled(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   const screen = SCREENS.find((item) => item.id === screenId) ?? SCREENS[0];
   const colour = COLORS.find((item) => item.id === colourId) ?? COLORS[0];
   if (!screen || !colour) return null;
 
-  const placement = PLACEMENTS.find((item) => item.id === placementId);
-  if (!placement) return null;
+  const tilt = !reduce && tiltEnabled;
+  const selectedSrc = imageFor(screen, colour.id);
 
   const selectScreen = (id: string) => {
-    const next = SCREENS.find((item) => item.id === id);
-    if (!next) return;
-    setScreenId(next.id);
-    if (!next.placements.includes(placementId)) {
-      setPlacementId(next.placements[0] ?? "wall");
-    }
+    if (SCREENS.some((item) => item.id === id)) setScreenId(id);
   };
 
   const selectColour = (id: string) => {
     if (COLORS.some((item) => item.id === id)) setColourId(id);
   };
 
-  const selectPlacement = (id: string) => {
-    const next = PLACEMENTS.find((item) => item.id === id);
-    if (next) setPlacementId(next.id);
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!tilt || event.pointerType === "touch") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    pointerX.set((event.clientX - rect.left) / rect.width - 0.5);
+    pointerY.set((event.clientY - rect.top) / rect.height - 0.5);
   };
 
-  const placementLabels = screen.placements
-    .map((id) => PLACEMENTS.find((item) => item.id === id)?.label ?? "")
-    .filter((label) => label.length > 0);
+  const resetTilt = () => {
+    pointerX.set(0);
+    pointerY.set(0);
+  };
 
   const revealProps = reduce
     ? {}
@@ -117,29 +145,32 @@ export default function ScreenSelector() {
             Pick the screen that fits your space
           </h2>
           <p className="mt-4 text-lg text-[#94a3b8]">
-            Select a shape and a colour, then see how it is placed.
+            Choose a type and a colour to see how it looks in a real space.
           </p>
         </motion.div>
 
-        <div className="mt-14 grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className="mt-14 grid gap-10 lg:grid-cols-12">
           <motion.div
             {...revealProps}
-            className="rounded-3xl border border-white/10 bg-[#0a1226] p-6"
+            className="order-2 min-w-0 lg:order-1 lg:col-span-5"
           >
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Screen shape
+                {"1  Screen type"}
               </p>
-              <div role="radiogroup" aria-label="Screen shape" className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div
+                role="radiogroup"
+                aria-label="Screen type"
+                className="mt-4 grid gap-3"
+              >
                 {SCREENS.map((item, index) => {
                   const active = item.id === screen.id;
-                  const miniW = item.ratio[0] === item.ratio[1] ? 18 : item.ratio[0] > item.ratio[1] ? 24 : 14;
-                  const miniH = item.ratio[0] === item.ratio[1] ? 18 : item.ratio[0] > item.ratio[1] ? 14 : 24;
+                  const src = imageFor(item, colour.id);
                   return (
                     <button
                       key={item.id}
                       ref={(node) => {
-                        shapeRefs.current[index] = node;
+                        screenRefs.current[index] = node;
                       }}
                       type="button"
                       role="radio"
@@ -147,36 +178,45 @@ export default function ScreenSelector() {
                       tabIndex={active ? 0 : -1}
                       onClick={() => selectScreen(item.id)}
                       onKeyDown={(event) =>
-                        moveSelection(event, index, SCREEN_IDS, selectScreen, shapeRefs)
+                        moveSelection(event, index, SCREEN_IDS, selectScreen, screenRefs)
                       }
-                      className={`relative rounded-2xl border p-4 text-left transition ${FOCUS_RING} ${
+                      className={`relative rounded-2xl border p-3 text-left transition ${FOCUS_RING} ${
                         active
-                          ? "border-sky-400/60 text-white"
-                          : "border-white/10 text-slate-300 hover:border-sky-400/30"
+                          ? "border-sky-400 bg-sky-400/10 shadow-[0_0_28px_rgba(56,189,248,0.2)]"
+                          : "border-white/10 bg-white/[0.02] hover:border-sky-400/30"
                       }`}
                     >
                       {active ? (
                         <motion.span
                           aria-hidden="true"
-                          layoutId="screen-shape-active"
+                          layoutId="screen-type-active"
                           className="absolute inset-0 rounded-2xl bg-sky-400/10"
-                          transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 28 }}
+                          transition={
+                            reduce
+                              ? { duration: 0 }
+                              : { type: "spring", stiffness: 300, damping: 28 }
+                          }
                         />
                       ) : null}
-                      <span className="relative z-10 flex items-start gap-3">
-                        <span
-                          aria-hidden="true"
-                          className="mt-1 block shrink-0 rounded-sm border border-sky-300/60"
-                          style={{ width: miniW, height: miniH }}
-                        />
+                      <span className="relative z-10 flex items-center gap-4">
+                        <span className="block h-24 w-[72px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#0f1b3a]">
+                          <ImageSlot
+                            src={src}
+                            alt={`${item.name} screen in ${colour.label}`}
+                            hint={src ?? undefined}
+                          />
+                        </span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold">{item.name}</span>
-                          <span className="mt-1 block text-xs text-slate-500">
-                            {ratioLabel(item.ratio)}
+                          <h3 className="text-lg font-semibold text-white">{item.name}</h3>
+                          <span className="mt-1 block text-sm text-[#94a3b8]">
+                            {item.tagline}
                           </span>
                         </span>
                         {active ? (
-                          <Check aria-hidden="true" className="ml-auto h-4 w-4 shrink-0 text-sky-400" />
+                          <Check
+                            aria-hidden="true"
+                            className="ml-auto h-5 w-5 shrink-0 text-sky-400"
+                          />
                         ) : null}
                       </span>
                     </button>
@@ -187,11 +227,16 @@ export default function ScreenSelector() {
 
             <div className="mt-8">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Colour
+                {"2  Colour"}
               </p>
-              <div role="radiogroup" aria-label="Screen colour" className="mt-4 flex flex-wrap gap-3">
+              <div
+                role="radiogroup"
+                aria-label="Screen colour"
+                className="mt-4 flex flex-wrap gap-8"
+              >
                 {COLORS.map((item, index) => {
                   const active = item.id === colour.id;
+                  const missing = imageFor(screen, item.id) === null;
                   return (
                     <button
                       key={item.id}
@@ -202,76 +247,41 @@ export default function ScreenSelector() {
                       role="radio"
                       aria-checked={active}
                       aria-label={`${item.label} colour`}
+                      title={missing ? "Photo coming soon" : undefined}
                       tabIndex={active ? 0 : -1}
                       onClick={() => selectColour(item.id)}
                       onKeyDown={(event) =>
                         moveSelection(event, index, COLOUR_IDS, selectColour, colourRefs)
                       }
-                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${FOCUS_RING} ${
-                        active
-                          ? "border-sky-400/60 bg-sky-400/10 text-white"
-                          : "border-white/10 text-slate-300 hover:border-sky-400/30"
-                      }`}
+                      className={`flex flex-col items-center gap-2 rounded-xl p-1 transition ${FOCUS_RING}`}
                     >
-                      <span
-                        aria-hidden="true"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/30"
-                        style={{ background: item.bezel }}
-                      >
-                        {active ? <Check className="h-3.5 w-3.5 text-sky-300" strokeWidth={3} /> : null}
-                      </span>
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Placement
-              </p>
-              <div role="radiogroup" aria-label="Screen placement" className="mt-4 grid gap-3 sm:grid-cols-3">
-                {PLACEMENTS.map((item, index) => {
-                  const supported = screen.placements.includes(item.id);
-                  const active = placementId === item.id;
-                  const Icon = PLACEMENT_ICONS[item.id];
-                  return (
-                    <button
-                      key={item.id}
-                      ref={(node) => {
-                        placementRefs.current[index] = node;
-                      }}
-                      type="button"
-                      role="radio"
-                      aria-checked={active && supported}
-                      aria-label={item.label}
-                      disabled={!supported}
-                      tabIndex={active && supported ? 0 : -1}
-                      onClick={() => selectPlacement(item.id)}
-                      onKeyDown={(event) =>
-                        moveSelection(event, index, PLACEMENT_IDS, selectPlacement, placementRefs)
-                      }
-                      title={supported ? item.description : "Not offered for this shape"}
-                      className={`relative rounded-2xl border p-3 text-center transition ${FOCUS_RING} ${
-                        !supported
-                          ? "cursor-not-allowed border-white/5 text-slate-600"
-                          : active
-                            ? "border-sky-400/60 text-white"
-                            : "border-white/10 text-slate-300 hover:border-sky-400/30"
-                      }`}
-                    >
-                      {active && supported ? (
-                        <motion.span
+                      <span className="relative">
+                        <span
                           aria-hidden="true"
-                          layoutId="placement-active"
-                          className="absolute inset-0 rounded-2xl bg-sky-400/10"
-                          transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 28 }}
-                        />
-                      ) : null}
-                      <span className="relative z-10 flex flex-col items-center gap-2">
-                        <Icon className="h-5 w-5" strokeWidth={1.8} />
-                        <span className="text-xs font-medium leading-tight">{item.label}</span>
+                          className={`relative flex h-11 w-11 items-center justify-center rounded-full ring-2 ${
+                            active ? "ring-sky-400" : "ring-white/20"
+                          }`}
+                          style={{ background: item.bezel }}
+                        >
+                          {active ? (
+                            <Check
+                              className="h-5 w-5 text-sky-300"
+                              strokeWidth={3}
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                        </span>
+                        {missing ? (
+                          <span
+                            aria-hidden="true"
+                            className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-[#050b1f]"
+                          />
+                        ) : null}
+                      </span>
+                      <span
+                        className={`text-sm ${active ? "font-semibold text-white" : "text-slate-300"}`}
+                      >
+                        {item.label}
                       </span>
                     </button>
                   );
@@ -281,36 +291,23 @@ export default function ScreenSelector() {
 
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${screen.id}-${colour.id}-${placement.id}`}
+                key={`${screen.id}-${colour.id}`}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.25 }}
-                className="mt-8 rounded-2xl border border-white/10 bg-[#050b1f] p-5"
+                className="mt-8 rounded-2xl border border-white/10 bg-[#0a1226] p-5"
               >
-                <h3 className="text-lg font-semibold text-white">{screen.name}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-400">{screen.description}</p>
-                <dl className="mt-4 space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-slate-500">Ratio</dt>
-                    <dd className="text-right text-slate-200">{ratioLabel(screen.ratio)}</dd>
-                  </div>
-                  {SHOW_SIZES ? (
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-slate-500">Size</dt>
-                      <dd className="text-right text-slate-200">{screen.diagonalInches} inch</dd>
-                    </div>
-                  ) : null}
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-slate-500">Fits</dt>
-                    <dd className="text-right text-slate-200">{placementLabels.join(", ")}</dd>
-                  </div>
-                </dl>
-                <p className="mt-4 text-sm leading-relaxed text-slate-400">{placement.description}</p>
-                <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                  {screen.installNotes[placement.id]}
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-lg font-semibold text-white">{screen.name}</h3>
+                  <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-xs font-medium text-sky-300">
+                    {screen.placementLabel}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-[#94a3b8]">
+                  {screen.description}
                 </p>
-                <div className="mt-4">
+                <div className="mt-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Best for
                   </p>
@@ -325,52 +322,131 @@ export default function ScreenSelector() {
                     ))}
                   </div>
                 </div>
+                <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-[#94a3b8]">
+                  <MapPin aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
+                  <span>{screen.installNote}</span>
+                </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
                     href={`/contact?screen=${encodeURIComponent(screen.id)}&color=${encodeURIComponent(colour.id)}`}
-                    className={`brand-gradient inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 ${FOCUS_RING}`}
+                    className={`inline-flex items-center rounded-full border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 ${FOCUS_RING}`}
                   >
                     Ask about this screen
                   </Link>
                   <Link
                     href="/book"
-                    className={`inline-flex items-center rounded-full border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 ${FOCUS_RING}`}
+                    className={`brand-gradient inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 ${FOCUS_RING}`}
                   >
                     Book CrystaGrid Ads
                   </Link>
                 </div>
               </motion.div>
             </AnimatePresence>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+              <p className="text-sm font-semibold text-white">Not sure which one?</p>
+              <div className="mt-2 grid gap-1">
+                {HELPER_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => selectScreen(item.id)}
+                      className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-[#94a3b8] transition hover:text-white ${FOCUS_RING}`}
+                    >
+                      <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-sky-400" />
+                      <span>{item.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </motion.div>
 
-          <motion.div {...revealProps} className="min-w-0">
-            <div className="rounded-[36px] border border-white/10 bg-[#0a1226] p-4">
-              <div className="aspect-[8/5] w-full overflow-hidden rounded-3xl border border-white/5 bg-[#050b1f]">
-                <PlacementScene screen={screen} colour={colour} placementId={placement.id} />
-              </div>
-              <p className="sr-only">
-                {`Preview of ${screen.name} in ${colour.label}, ${placement.label}`}
-              </p>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {[0, 1, 2].map((index) => {
-                  const src = index === 0 ? imageFor(screen, colour.id) : index === 1 ? screen.images.installed : null;
-                  const hint =
-                    index === 0
-                      ? `public/signage/${screen.id}-${colour.id}.png`
-                      : index === 1
-                        ? `public/signage/${screen.id}-installed.jpg`
-                        : "public/signage/detail.png";
+          <motion.div
+            {...revealProps}
+            className="relative order-1 min-w-0 lg:sticky lg:top-28 lg:order-2 lg:col-span-7 lg:self-start"
+          >
+            <div aria-hidden="true" className="absolute -inset-6 rounded-[48px] blur-3xl">
+              <div
+                className="absolute inset-0 rounded-[48px] transition-opacity duration-[400ms]"
+                style={{
+                  background: "radial-gradient(circle at 50% 45%, rgba(14,165,233,0.25), transparent 70%)",
+                  opacity: colour.id === "black" ? 1 : 0,
+                }}
+              />
+              <div
+                className="absolute inset-0 rounded-[48px] transition-opacity duration-[400ms]"
+                style={{
+                  background: "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.18), transparent 70%)",
+                  opacity: colour.id === "white" ? 1 : 0,
+                }}
+              />
+            </div>
+            <div className="relative rounded-[36px] border border-white/10 bg-[#0a1226] p-4">
+              <motion.div
+                onPointerMove={handlePointerMove}
+                onPointerLeave={resetTilt}
+                style={{
+                  width: "min(100%, 480px, 52.5vh)",
+                  rotateX: tilt ? rotateX : 0,
+                  rotateY: tilt ? rotateY : 0,
+                  transformPerspective: 900,
+                }}
+                className="relative mx-auto aspect-[3/4] overflow-hidden rounded-[28px] bg-[#0f1b3a] shadow-[0_24px_70px_rgba(2,6,23,0.6)]"
+              >
+                <AnimatePresence>
+                  <motion.div
+                    key={`${screen.id}-${colour.id}`}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, scale: reduce ? 1 : 1.03 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: reduce ? 0 : 0.45 }}
+                  >
+                    <ImageSlot
+                      src={selectedSrc}
+                      alt={`${screen.name} screen in ${colour.label}`}
+                      hint={selectedSrc ?? undefined}
+                    />
+                  </motion.div>
+                </AnimatePresence>
+                <span className="absolute left-4 top-4 z-10 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
+                  {`${screen.name} - ${colour.label}`}
+                </span>
+              </motion.div>
+
+              <div className="mt-5 flex justify-center gap-6">
+                {COLORS.map((item) => {
+                  const active = item.id === colour.id;
+                  const src = imageFor(screen, item.id);
                   return (
-                    <div
-                      key={index}
-                      className="aspect-square overflow-hidden rounded-2xl border border-white/10"
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-label={`Show ${screen.name} in ${item.label}`}
+                      aria-pressed={active}
+                      onClick={() => selectColour(item.id)}
+                      className={`flex flex-col items-center gap-2 rounded-xl p-1 ${FOCUS_RING}`}
                     >
-                      <ImageSlot
-                        src={src}
-                        alt={`${screen.name} mockup ${index + 1}`}
-                        hint={hint}
-                      />
-                    </div>
+                      <span
+                        className={`block h-20 w-16 overflow-hidden rounded-xl border-2 bg-[#0f1b3a] ${
+                          active ? "border-sky-400" : "border-white/10"
+                        }`}
+                      >
+                        <ImageSlot
+                          src={src}
+                          alt={`${screen.name} screen in ${item.label}`}
+                          hint={src ?? undefined}
+                        />
+                      </span>
+                      <span
+                        className={`text-xs ${active ? "font-semibold text-white" : "text-slate-400"}`}
+                      >
+                        {item.label}
+                      </span>
+                    </button>
                   );
                 })}
               </div>

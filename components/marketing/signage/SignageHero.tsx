@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import ScreenFrame from "@/components/marketing/signage/ScreenFrame";
-import { COLORS, SCREENS } from "@/lib/signage-screens";
+import ImageSlot from "@/components/marketing/signage/ImageSlot";
+import { COLORS, SCREENS, imageFor } from "@/lib/signage-screens";
 
 const STAGE_FRAMES = [
-  { id: "wide", width: 210, left: 40, top: 90, rotate: -6, z: 20, float: 6, delay: 0 },
-  { id: "tall", width: 120, left: 300, top: 40, rotate: 5, z: 30, float: 7, delay: 0.6 },
-  { id: "classic", width: 180, left: 250, top: 260, rotate: -4, z: 15, float: 5, delay: 1.1 },
-  { id: "square", width: 140, left: 50, top: 320, rotate: 6, z: 25, float: 8, delay: 0.3 },
+  { id: "floor", width: 220, left: 30, top: 80, rotate: -6, z: 20, float: 6, delay: 0 },
+  { id: "board", width: 190, left: 310, top: 35, rotate: 5, z: 30, float: 7, delay: 0.6 },
+  { id: "lift", width: 205, left: 250, top: 265, rotate: -4, z: 15, float: 5, delay: 1.1 },
 ] as const;
 
 const FOCUS_RING =
@@ -25,7 +24,6 @@ export default function SignageHero() {
   });
   const parallax = useTransform(scrollYProgress, [0, 1], [24, -24]);
   const reduce = Boolean(reducedMotion);
-  const firstColour = COLORS[0];
 
   const revealProps = reduce
     ? {}
@@ -85,7 +83,7 @@ export default function SignageHero() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-2">
-            {[`${SCREENS.length} screen shapes`, `${COLORS.length} colours`, "Dehradun"].map((chip) => (
+            {[`${SCREENS.length} screen types`, `${COLORS.length} colours`, "Dehradun"].map((chip) => (
               <span
                 key={chip}
                 className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300"
@@ -109,7 +107,8 @@ export default function SignageHero() {
               />
               {STAGE_FRAMES.map((frame) => {
                 const screen = SCREENS.find((item) => item.id === frame.id);
-                if (!screen || !firstColour) return null;
+                if (!screen) return null;
+                const src = imageFor(screen, screen.heroColour);
                 return (
                   <motion.div
                     key={frame.id}
@@ -128,12 +127,19 @@ export default function SignageHero() {
                     }
                   >
                     <div style={{ transform: `rotate(${frame.rotate}deg)` }}>
-                      <ScreenFrame
-                        ratio={screen.ratio}
-                        colour={firstColour}
-                        width={frame.width}
-                        demo
-                      />
+                      <div
+                        className="relative aspect-[3/4] overflow-hidden rounded-3xl border border-white/[0.12] bg-[#0f1b3a] shadow-[0_24px_60px_rgba(2,6,23,0.65),0_0_40px_rgba(56,189,248,0.28)]"
+                        style={{ width: frame.width }}
+                      >
+                        <ImageSlot
+                          src={src}
+                          alt={`${screen.name} screen`}
+                          hint={src ?? undefined}
+                        />
+                        <span className="absolute bottom-3 left-3 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
+                          {screen.name}
+                        </span>
+                      </div>
                     </div>
                   </motion.div>
                 );

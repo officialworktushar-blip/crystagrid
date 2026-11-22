@@ -1,9 +1,7 @@
-// EDIT THESE VALUES: the screens, ratios and colours below are PLACEHOLDERS, replace them with the real products before publishing.
+// EDIT THESE VALUES: the screen types, colours and photo paths below are the real products.
 
 export const SHOW_PLACEHOLDER_HINTS = true;
 export const SHOW_SIZES = false;
-
-export type PlacementId = "wall" | "floor" | "lift";
 
 export type Colour = {
   id: string;
@@ -12,24 +10,19 @@ export type Colour = {
   body: string;
 };
 
-export type Placement = {
-  id: PlacementId;
-  label: string;
-  description: string;
-};
-
 export type Screen = {
   id: string;
   name: string;
-  ratio: [number, number];
+  tagline: string;
+  placementLabel: string;
   description: string;
-  diagonalInches: number;
-  placements: PlacementId[];
   bestFor: string[];
-  installNotes: Record<PlacementId, string>;
+  installNote: string;
+  heroColour: string;
+  ratio?: [number, number] | null;
   images: {
-    front: Record<string, string | null>;
-    installed: string | null;
+    black: string | null;
+    white: string | null;
   };
 };
 
@@ -38,96 +31,60 @@ export const COLORS: Colour[] = [
   { id: "white", label: "White", bezel: "#e8edf5", body: "#cbd5e1" },
 ];
 
-export const PLACEMENTS: Placement[] = [
-  {
-    id: "wall",
-    label: "Wall mounted",
-    description: "Fixed flat on a wall at eye level.",
-  },
+export const SCREENS: Screen[] = [
   {
     id: "floor",
-    label: "Floor standing",
-    description: "A free-standing unit that can be moved when needed.",
+    name: "Floor",
+    tagline: "Free-standing kiosk screen",
+    placementLabel: "Floor standing",
+    description:
+      "A free-standing screen that stands on its own, ideal for open floors where people walk in and gather.",
+    bestFor: ["Showrooms", "Malls and retail floors", "Reception areas"],
+    installNote: "Stands on the floor, so it can be placed where footfall is highest.",
+    heroColour: "black",
+    ratio: null,
+    images: { black: "/Floor_Black.webp", white: "/Floor_White.png" },
+  },
+  {
+    id: "board",
+    name: "Board",
+    tagline: "A-frame style screen",
+    placementLabel: "A-frame board",
+    description:
+      "A slim A-frame style screen that works like a digital offer or menu board at the entrance of a shop or cafe.",
+    bestFor: ["Cafes and restaurants", "Shop entrances", "Salons and gyms"],
+    installNote: "Stands on the floor near the entrance and can be moved when needed.",
+    heroColour: "white",
+    ratio: null,
+    images: { black: "/Board_Black.webp", white: "/Board_White.webp" },
   },
   {
     id: "lift",
-    label: "Lift and pillar side",
-    description: "Next to lift doors or on a pillar, where people wait.",
+    name: "Lift",
+    tagline: "Wall screen beside the lift",
+    placementLabel: "Wall mounted by the lift",
+    description:
+      "A wall mounted screen placed next to the lift doors, where people wait for a few quiet seconds.",
+    bestFor: ["Residential towers", "Office buildings", "Mall lift lobbies"],
+    installNote: "Fixed on the wall beside the lift doors at eye level.",
+    heroColour: "black",
+    ratio: null,
+    images: { black: "/Lift_Black.webp", white: "/Lift_White.webp" },
   },
 ];
 
-export const SCREENS: Screen[] = [
-  {
-    id: "wide",
-    name: "Wide Landscape",
-    ratio: [16, 9],
-    description: "A broad screen for everyday campaigns.",
-    diagonalInches: 43,
-    placements: ["wall", "floor"],
-    bestFor: ["Shops", "Gyms & Salons"],
-    installNotes: {
-      wall: "Fixed flat on the shop wall at eye level.",
-      floor: "Stands on a slim base where floor space allows.",
-      lift: "Wall space beside the lift is limited for this shape.",
-    },
-    images: { front: { black: null, white: null }, installed: null },
-  },
-  {
-    id: "tall",
-    name: "Tall Portrait",
-    ratio: [9, 16],
-    description: "An upright screen for places where people pause.",
-    diagonalInches: 43,
-    placements: ["floor", "wall", "lift"],
-    bestFor: ["Lift lobbies", "Offices & Lobbies"],
-    installNotes: {
-      wall: "Mounted upright on the lobby wall.",
-      floor: "Placed on a weighted base near the waiting area.",
-      lift: "Sits on the wall beside the lift doors.",
-    },
-    images: { front: { black: null, white: null }, installed: null },
-  },
-  {
-    id: "classic",
-    name: "Classic",
-    ratio: [4, 3],
-    description: "A familiar frame for everyday displays.",
-    diagonalInches: 32,
-    placements: ["wall"],
-    bestFor: ["Cafes", "Counters"],
-    installNotes: {
-      wall: "Fixed above the counter at a comfortable viewing height.",
-      floor: "A floor base is not offered for this shape.",
-      lift: "A lift-side mount is not offered for this shape.",
-    },
-    images: { front: { black: null, white: null }, installed: null },
-  },
-  {
-    id: "square",
-    name: "Square",
-    ratio: [1, 1],
-    description: "An even frame for close-up spaces.",
-    diagonalInches: 32,
-    placements: ["wall", "floor"],
-    bestFor: ["Reception desks", "Shops"],
-    installNotes: {
-      wall: "Mounted level with the reception wall.",
-      floor: "Sits on a compact stand on the counter or floor.",
-      lift: "A lift-side mount is not offered for this shape.",
-    },
-    images: { front: { black: null, white: null }, installed: null },
-  },
-];
-
-export function ratioLabel(ratio: readonly [number, number]): string {
+export function ratioLabel(ratio: readonly [number, number] | null | undefined): string {
+  if (!ratio) return "";
   return `${ratio[0]}:${ratio[1]}`;
 }
 
-export function isPortrait(ratio: readonly [number, number]): boolean {
+export function isPortrait(ratio: readonly [number, number] | null | undefined): boolean {
+  if (!ratio) return false;
   return ratio[1] > ratio[0];
 }
 
 export function imageFor(screen: Screen, colourId: string): string | null {
-  const value = screen.images.front[colourId];
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
+  if (colourId === "black") return screen.images.black;
+  if (colourId === "white") return screen.images.white;
+  return null;
 }

@@ -8,34 +8,35 @@ import SectionHeading from "@/components/ui/SectionHeading";
 
 const faqs = [
   {
-    question: "What is digital signage?",
+    question:
+      "01. How can CrystaGrid be deployed across multiple residential properties?",
     answer:
-      "Digital signage is the use of screens to show images, video, menus, and live updates. Crystagrid lets you manage that content remotely instead of changing each screen by hand.",
+      "CrystaGrid enables property owners and operators to connect digital displays across multiple residential communities through a centralized platform. Each property can be managed individually while remaining part of one connected advertising network.",
   },
   {
-    question: "How do I pair a screen?",
+    question: "02. Can I manage screens across different locations from one dashboard?",
     answer:
-      "Open the Crystagrid player on your screen and enter the 6-digit code shown in your dashboard. Once paired, the screen appears in your account and can receive playlists.",
+      "Yes. CrystaGrid provides a centralized dashboard where you can organize, monitor, and manage connected screens across multiple properties and locations without needing separate management systems.",
   },
   {
-    question: "What devices are supported?",
+    question: "03. How does CrystaGrid help monetize unused digital display spaces?",
     answer:
-      "Crystagrid runs on Android-based displays and devices that can run the Crystagrid player. If you are unsure about a specific device, contact us and we will confirm before you roll it out.",
+      "CrystaGrid helps transform strategically placed screens within residential properties into digital advertising opportunities. Property owners can make these spaces available for brand campaigns and explore new advertising revenue opportunities.",
   },
   {
-    question: "Can I schedule different content on different screens?",
+    question: "04. Can advertising campaigns be customized for specific properties or audiences?",
     answer:
-      "Yes. Screens can have their own playlists, so content can differ by location. Playlist item durations control how long each piece stays on screen.",
+      "Yes. You can select specific screens and locations for individual campaigns. This allows advertising content to be distributed according to property, location, and campaign requirements rather than displaying the same content everywhere.",
   },
   {
-    question: "Is my media stored securely?",
+    question: "05. What happens if a connected screen goes offline?",
     answer:
-      "Your media is stored in the cloud and accessed through your authenticated Crystagrid account. Only users with access to your account can manage it.",
+      "CrystaGrid provides screen visibility through its dashboard, allowing operators to identify online and offline displays and check their last-seen status. This helps teams identify connectivity issues and coordinate troubleshooting.",
   },
   {
-    question: "Can I manage multiple screens from one account?",
+    question: "06. Can the platform scale as our residential screen network expands?",
     answer:
-      "Yes. One account can manage multiple screens. Agencies and multi-location teams can also use separate customer accounts to keep each client's screens and media apart.",
+      "Yes. CrystaGrid is designed to support centralized management as your network grows. You can add more connected screens and residential properties while continuing to manage your expanding network through the same platform.",
   },
 ];
 
@@ -55,7 +56,7 @@ export default function Faq() {
         <motion.div {...fadeUp}>
           <SectionHeading
             eyebrow="FAQs"
-            title="Frequently asked questions"
+            title="Frequently Asked Questions"
           />
 
           <div className="mx-auto mt-12 max-w-3xl rounded-3xl border border-white/10 bg-surface px-6 sm:px-8">

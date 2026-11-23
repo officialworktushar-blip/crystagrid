@@ -3,10 +3,10 @@ import Container from "@/components/ui/Container";
 import { cn } from "@/lib/utils";
 
 const stats = [
-  { value: "6-digit", label: "Screen pairing" },
-  { value: "Real-time", label: "Content delivery" },
-  { value: "Unlimited", label: "Media uploads" },
-  { value: "24/7", label: "Screen visibility" },
+  { value: "Live Dashboard", label: "Easy Access" },
+  { value: "Remote Control", label: "Easy Management" },
+  { value: "Performance Analytics", label: "Real-time Insights" },
+  { value: "Automated Scheduling", label: "Flexible Playback" },
 ];
 
 export default function StatsRow() {

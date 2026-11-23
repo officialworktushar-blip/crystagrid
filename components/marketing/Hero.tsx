@@ -7,7 +7,7 @@ export default function Hero() {
     <section className="relative isolate flex min-h-screen w-full items-start justify-center overflow-hidden bg-background px-6 pb-24">
       <video
         className="absolute inset-0 h-full w-full object-cover z-0"
-        src="/hero_video.webm"
+        src="/Hero_Video.webm"
         autoPlay
         loop
         muted

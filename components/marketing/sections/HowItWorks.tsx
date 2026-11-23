@@ -8,19 +8,24 @@ import Container from "@/components/ui/Container";
 
 const steps = [
   {
-    title: "Connect Your Screen",
+    title: "Access Your Dashboard",
     description:
-      "Pair your Android-powered display using a simple 6-digit activation code. Connect your screen to your CrystaGrid dashboard in minutes.",
+      "Log in to your CrystaGrid account and access a centralized dashboard. Monitor and manage 100+ connected screens from one place.",
   },
   {
-    title: "Upload Your Content",
+    title: "Select Your Screens",
     description:
-      "Build your media library with images and videos. Organize your advertising creatives and keep everything ready for publishing.",
+      "Choose the display screens where you want your content to appear. Manage individual screens or organize multiple displays with ease.",
+  },
+  {
+    title: "Upload & Organize Content",
+    description:
+      "Upload your advertising creatives, including images and videos. Build your media library and keep your content ready for publishing.",
   },
   {
     title: "Publish & Manage",
     description:
-      "Create playlists, assign content to individual screens, and push updates in real time. Manage your connected displays from anywhere.",
+      "Assign content to selected screens, schedule playlists, and publish updates in real time. Control your entire screen network from anywhere.",
   },
 ];
 
@@ -33,7 +38,7 @@ const fadeUp = {
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="scroll-mt-28 py-24">
+    <section id="how-it-works" className="scroll-mt-28 overflow-x-clip py-24">
       <Container>
         <motion.div
           {...fadeUp}
@@ -83,7 +88,7 @@ export default function HowItWorks() {
 
           <div className="relative">
             <div className="absolute -inset-6 rounded-[2.5rem] bg-sky-500/10 blur-3xl" />
-            <div className="relative">
+            <div className="relative scale-[1.12]">
               <Image
                 src="/Home_MockUp.webp"
                 alt="Crystagrid self-serve dashboard"

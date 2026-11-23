@@ -8,27 +8,27 @@ import SectionHeading from "@/components/ui/SectionHeading";
 
 const features = [
   {
-    title: "Easy Pairing",
+    title: "Multi-Location Management",
     description:
-      "Connect a screen in seconds with a 6-digit code that expires after 10 minutes.",
+      "Manage digital displays across multiple properties, branches and locations from one centralized dashboard.",
     icon: MonitorSmartphone,
   },
   {
-    title: "Media Library",
+    title: "100+ Screen Management",
     description:
-      "Keep images and videos organised in one shared library for every screen.",
+      "Control and monitor 100+ connected screens without switching between multiple accounts or dashboards.",
     icon: Images,
   },
   {
-    title: "Playlists",
+    title: "Centralized Content Control",
     description:
-      "Drag to reorder content and set how long each item stays on screen.",
+      "Upload, organize and distribute advertising content across selected screens with complete control.",
     icon: ListVideo,
   },
   {
-    title: "Live Status",
+    title: "Remote Screen Management",
     description:
-      "See which screens are online or offline, plus when each one was last seen.",
+      "Manage your display network from anywhere. Update content, control playback and monitor screen activity remotely.",
     icon: Activity,
   },
 ];

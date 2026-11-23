@@ -6,23 +6,24 @@ import Container from "@/components/ui/Container";
 
 const capabilities = [
   {
-    title: "Ambient DOOH Network",
+    title: "Multi-Property Network",
     description:
-      "Digital advertising opportunities across residential, commercial, retail, and lifestyle environments.",
+      "Connect advertising screens across multiple residential properties and housing communities through one platform.",
   },
   {
     title: "Centralized Screen Management",
-    description: "Manage multiple digital displays through one unified dashboard.",
+    description:
+      "Monitor and manage displays across different residential locations from a single dashboard.",
   },
   {
-    title: "Real-Time Content Publishing",
+    title: "Remote Content Publishing",
     description:
-      "Update advertising creatives and playlists across connected screens remotely.",
+      "Upload, schedule, and publish advertising campaigns across selected screens in real time.",
   },
   {
-    title: "Connected Audience Touchpoints",
+    title: "Residential Audience Reach",
     description:
-      "Bring brands closer to consumers in the places where they live, work, shop, and spend their time.",
+      "Help brands connect with residents through strategically placed digital displays in everyday community spaces.",
   },
 ];
 
@@ -47,25 +48,28 @@ export default function Capabilities() {
             </p>
 
             <h2 className="mt-4 text-3xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl">
-              Bringing Digital Advertising Into Everyday Spaces.
+              Bringing Digital Advertising Into{" "}
+              <span className="text-brand-gradient">Residential Societies</span>.
             </h2>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-body sm:text-lg">
-              CrystaGrid is building an ambient Digital Out-of-Home advertising
-              ecosystem that connects brands with audiences across the
-              environments they experience every day.
+              CrystaGrid is transforming residential properties into connected
+              digital advertising environments, bringing brands closer to
+              audiences where they live every day.
             </p>
 
             <p className="mt-4 max-w-xl text-base leading-7 text-body sm:text-lg">
-              From residential communities and corporate spaces to caf&eacute;s,
-              retail destinations, and commercial properties, we transform
-              everyday touchpoints into digital advertising opportunities.
+              From apartment complexes and gated communities to residential
+              towers and premium housing societies, we turn everyday
+              residential touchpoints into valuable digital advertising
+              spaces.
             </p>
 
             <p className="mt-4 max-w-xl text-base leading-7 text-body sm:text-lg">
-              Our platform brings screen connectivity, centralized content
-              management, and real-time publishing together, making digital
-              signage easier to deploy, manage, and scale.
+              Our platform enables centralized screen management, seamless
+              content distribution, and real-time publishing, helping property
+              owners build smarter advertising networks while giving brands
+              access to residential audiences.
             </p>
           </div>
 

@@ -7,13 +7,15 @@ export default function Hero() {
     <section className="relative isolate flex min-h-screen w-full items-start justify-center overflow-hidden bg-background px-6 pb-24">
       <video
         className="absolute inset-0 h-full w-full object-cover z-0"
-        src="/Hero_Video.webm"
         autoPlay
         loop
         muted
         playsInline
         aria-hidden="true"
-      />
+      >
+        <source src="/hero_video.webm" type="video/webm" />
+        <source src="/Hero_Video.webm" type="video/webm" />
+      </video>
 
       <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
 

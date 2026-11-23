@@ -34,25 +34,25 @@ export type HeroMedia = {
 };
 
 export const ABOUT_HERO_MEDIA: HeroMedia[] = [
-  { src: ABOUT_IMAGES[0].src, alt: ABOUT_IMAGES[0].alt, orientation: "portrait" },
+  { src: "/View_Tarya.webp", alt: ABOUT_IMAGES[0].alt, orientation: "portrait" },
   {
-    src: "/Cafe_Horizontal.webp",
+    src: "/View_RS.webp",
     alt: "Digital screens in cafes and restaurants",
     orientation: "landscape",
   },
-  { src: ABOUT_IMAGES[1].src, alt: ABOUT_IMAGES[1].alt, orientation: "portrait" },
+  { src: "/View_FreshMart.webp", alt: ABOUT_IMAGES[1].alt, orientation: "portrait" },
   {
-    src: "/Apartment_Horizontal.webp",
+    src: "/View_Fit.webp",
     alt: "Digital screens in residential buildings",
     orientation: "landscape",
   },
-  { src: ABOUT_IMAGES[2].src, alt: ABOUT_IMAGES[2].alt, orientation: "portrait" },
+  { src: "/View_Car.webp", alt: ABOUT_IMAGES[2].alt, orientation: "portrait" },
   {
-    src: "/Trends_Horizontal.webp",
+    src: "/View_Tarya.webp",
     alt: "Retail screens showing current trends",
     orientation: "landscape",
   },
-  { src: ABOUT_IMAGES[3].src, alt: ABOUT_IMAGES[3].alt, orientation: "portrait" },
+  { src: "/View_RS.webp", alt: ABOUT_IMAGES[3].alt, orientation: "portrait" },
 ];
 
 export const VIDEO_SRC = "/about-video.mp4";

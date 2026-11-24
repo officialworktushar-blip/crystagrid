@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
 const solutions = [
-  { href: "/solutions/digital-signage", label: "Digital Signage" },
+  { href: "/book", label: "Residential Ads" },
 ];
 
 function SolutionsMenu() {

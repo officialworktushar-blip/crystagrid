@@ -12,6 +12,16 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async redirects() {
+    // Digital Signage page is switched off for now. Remove this redirect to bring it back.
+    return [
+      {
+        source: "/solutions/digital-signage",
+        destination: "/book",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

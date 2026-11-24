@@ -15,15 +15,20 @@ export default async function BookingLayout({
     <div className="booking-theme flex min-h-screen flex-col bg-[#f8fafc] text-[#0f172a] [color-scheme:light]">
       <header className="sticky top-0 z-40 border-b border-[#e5e7eb] bg-[#f8fafc]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="inline-flex items-center">
+          <Link
+            href="/"
+            className="inline-flex origin-left scale-[1.15] items-center gap-2.5 whitespace-nowrap text-lg font-extrabold tracking-tight"
+          >
             <Image
-              src="/logo.webp"
-              alt="Crystagrid"
+              src="/logo_wihtout_text.webp"
+              alt=""
               width={256}
               height={256}
               priority
-              className="h-12 w-auto origin-left scale-[1.15] object-contain"
+              className="h-9 w-auto shrink-0 object-contain"
             />
+            <span className="text-black">Crysta</span>
+            <span className="text-sky-500">Grid</span>
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-4">

@@ -1,6 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getSessionProfile } from "@/lib/auth";
 
 export default async function BookingLayout({
@@ -14,14 +15,15 @@ export default async function BookingLayout({
     <div className="booking-theme flex min-h-screen flex-col bg-[#f8fafc] text-[#0f172a] [color-scheme:light]">
       <header className="sticky top-0 z-40 border-b border-[#e5e7eb] bg-[#f8fafc]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link
-            href="/"
-            className="inline-flex origin-left scale-[1.15] items-center gap-2.5 text-lg font-extrabold tracking-tight text-[#0f172a]"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1d6fff] text-white shadow-[0_10px_24px_-12px_rgba(29,111,255,0.9)]">
-              <LayoutGrid aria-hidden="true" className="h-4 w-4" />
-            </span>
-            Crystagrid
+          <Link href="/" className="inline-flex items-center">
+            <Image
+              src="/logo.webp"
+              alt="Crystagrid"
+              width={256}
+              height={256}
+              priority
+              className="h-12 w-auto origin-left scale-[1.15] object-contain"
+            />
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-4">

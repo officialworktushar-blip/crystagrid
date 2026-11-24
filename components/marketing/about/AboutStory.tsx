@@ -71,7 +71,7 @@ export default function AboutStory() {
           <motion.div {...revealProps}>
             <div
               ref={frameRef}
-              className="relative aspect-video w-full overflow-hidden rounded-[40px] lg:aspect-[4/5]"
+              className="relative mx-auto aspect-video w-4/5 overflow-hidden rounded-[40px] lg:aspect-[4/5]"
               style={{
                 border: "1px solid rgba(255,255,255,0.1)",
                 boxShadow: "0 30px 80px -30px rgba(14,165,233,0.45)",
@@ -82,8 +82,8 @@ export default function AboutStory() {
                   src={STORY_IMAGE}
                   alt={ABOUT_IMAGES[0].alt}
                   fill
-                  sizes="(min-width: 1024px) 50vw, 100vw"
-                  className="object-cover scale-[0.8]"
+                  sizes="(min-width: 1024px) 40vw, 80vw"
+                  className="object-cover"
                 />
               ) : (
                 <video
@@ -96,7 +96,7 @@ export default function AboutStory() {
                   playsInline
                   preload="metadata"
                   onError={() => setVideoFailed(true)}
-                  className="h-full w-full object-cover scale-[0.8]"
+                  className="h-full w-full object-cover"
                   aria-label={ABOUT_STORY.heading}
                 />
               )}

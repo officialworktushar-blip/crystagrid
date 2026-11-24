@@ -9,6 +9,13 @@ import { ABOUT_IMAGES, ABOUT_NETWORK } from "@/lib/about-content";
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d6fff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#020617]";
 
+const NETWORK_IMAGES = [
+  "/View_FreshMart.webp",
+  "/View_RS.webp",
+  "/View_Tarya.webp",
+  "/View_Car.webp",
+];
+
 export default function AboutNetwork() {
   const reducedMotion = useReducedMotion();
   const [reduce, setReduce] = useState(false);
@@ -41,7 +48,7 @@ export default function AboutNetwork() {
         <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {ABOUT_IMAGES.map((item, index) => (
             <motion.div
-              key={item.src}
+              key={NETWORK_IMAGES[index]}
               {...revealProps}
               transition={reduce ? undefined : { duration: 0.6, delay: index * 0.08 }}
               whileHover={reduce ? undefined : { y: -6, transition: { duration: 0.25 } }}
@@ -49,7 +56,7 @@ export default function AboutNetwork() {
             >
               <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[22px]">
                 <Image
-                  src={item.src}
+                  src={NETWORK_IMAGES[index]}
                   alt={item.alt}
                   fill
                   sizes="(min-width: 1280px) 25vw, (min-width: 640px) 50vw, 100vw"

@@ -17,7 +17,7 @@ export default async function BookingLayout({
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link
             href="/"
-            className="inline-flex origin-left scale-[1.15] items-center gap-2.5 whitespace-nowrap text-lg font-extrabold tracking-tight"
+            className="inline-flex origin-left scale-[1.5] items-center gap-2.5 whitespace-nowrap text-lg font-extrabold tracking-tight"
           >
             <Image
               src="/logo_wihtout_text.webp"
@@ -27,8 +27,10 @@ export default async function BookingLayout({
               priority
               className="h-9 w-auto shrink-0 object-contain"
             />
-            <span className="text-black">Crysta</span>
-            <span className="text-sky-500">Grid</span>
+            <span>
+              <span className="text-black">Crysta</span>{" "}
+              <span className="text-sky-500">Grid</span>
+            </span>
           </Link>
 
           <div className="flex items-center gap-2 sm:gap-4">

@@ -17,7 +17,7 @@ export default async function BookingLayout({
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link
             href="/"
-            className="inline-flex origin-left scale-[1.5] items-center gap-2.5 whitespace-nowrap text-lg font-extrabold tracking-tight"
+            className="inline-flex origin-left scale-[1.3] items-center gap-2.5 whitespace-nowrap text-lg font-extrabold tracking-tight"
           >
             <Image
               src="/logo_wihtout_text.webp"

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function AboutUsPage() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#020617]">
+    <div className="dark-grid-section min-h-screen overflow-x-hidden">
       <AboutHero />
       <AboutStory />
       <AboutVision />

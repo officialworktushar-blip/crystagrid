@@ -36,7 +36,7 @@ const fadeUp = {
 
 export default function Capabilities() {
   return (
-    <section id="capabilities" className="scroll-mt-28 py-24">
+    <section id="capabilities" className="dark-grid-section scroll-mt-28 py-24">
       <Container>
         <motion.div
           {...fadeUp}

@@ -42,7 +42,7 @@ const fadeUp = {
 
 export default function Features() {
   return (
-    <section id="features" className="scroll-mt-28 py-24">
+    <section id="features" className="dark-grid-section scroll-mt-28 py-24">
       <Container>
         <motion.div {...fadeUp}>
           <SectionHeading

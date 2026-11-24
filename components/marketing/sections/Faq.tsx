@@ -51,7 +51,7 @@ export default function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faqs" className="py-24">
+    <section id="faqs" className="dark-grid-section py-24">
       <Container>
         <motion.div {...fadeUp}>
           <SectionHeading

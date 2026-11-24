@@ -38,7 +38,7 @@ const fadeUp = {
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="scroll-mt-28 overflow-x-clip py-24">
+    <section id="how-it-works" className="dark-grid-section scroll-mt-28 overflow-x-clip py-24">
       <Container>
         <motion.div
           {...fadeUp}

@@ -76,6 +76,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.dark-grid-section {
+  background-color: #060b14;
+  background-image:
+    linear-gradient(to right, rgba(56, 189, 248, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.06) 1px, transparent 1px),
+    radial-gradient(circle at 0% 50%, rgba(12, 74, 110, 0.45) 0%, rgba(6, 11, 20, 0.95) 55%, #05080f 100%);
+  background-size: 64px 64px, 64px 64px, 100% 100%;
+  background-position: top left, top left, center center;
+}
+
 /* Panel scope: only dashboard, admin and panel layouts, not marketing/booking/player. */
 .panel-theme {
   --panel-bg: #020617;

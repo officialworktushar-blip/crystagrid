@@ -102,7 +102,7 @@ export default function ManageSidebar({
               alt=""
               width={256}
               height={256}
-              className="h-16 w-auto shrink-0 object-contain"
+              className="h-16 w-auto shrink-0 origin-left scale-[1.15] object-contain"
             />
           </Link>
 

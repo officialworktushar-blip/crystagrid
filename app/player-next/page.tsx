@@ -237,7 +237,7 @@ function BrandLogo() {
         alt="Crystagrid"
         width={640}
         height={640}
-        className="h-20 w-auto object-contain"
+        className="h-20 w-auto origin-left scale-[1.15] object-contain"
       />
     </div>
   );

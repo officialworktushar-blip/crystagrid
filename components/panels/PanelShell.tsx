@@ -150,7 +150,7 @@ export default function PanelShell({
             onClick={() => setOpen(false)}
             className="flex min-w-0 items-center gap-2"
           >
-            <span className="text-base font-extrabold tracking-tight text-brand-gradient">
+            <span className="inline-block origin-left scale-[1.15] text-base font-extrabold tracking-tight text-brand-gradient">
               Crystagrid
             </span>
             <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-bold tracking-[0.16em] text-white/60">

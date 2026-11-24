@@ -5,6 +5,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { ABOUT_IMAGES, ABOUT_STORY, VIDEO_SRC } from "@/lib/about-content";
 
+const STORY_IMAGE = "/View_FreshMart.webp";
+
 export default function AboutStory() {
   const reducedMotion = useReducedMotion();
   const [reduce, setReduce] = useState(false);
@@ -77,24 +79,24 @@ export default function AboutStory() {
             >
               {reduce || videoFailed ? (
                 <Image
-                  src={ABOUT_IMAGES[0].src}
+                  src={STORY_IMAGE}
                   alt={ABOUT_IMAGES[0].alt}
                   fill
                   sizes="(min-width: 1024px) 50vw, 100vw"
-                  className="object-cover"
+                  className="object-cover scale-[0.8]"
                 />
               ) : (
                 <video
                   ref={videoRef}
                   src={VIDEO_SRC}
-                  poster={ABOUT_IMAGES[0].src}
+                  poster={STORY_IMAGE}
                   autoPlay
                   muted
                   loop
                   playsInline
                   preload="metadata"
                   onError={() => setVideoFailed(true)}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover scale-[0.8]"
                   aria-label={ABOUT_STORY.heading}
                 />
               )}

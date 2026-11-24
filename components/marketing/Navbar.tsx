@@ -134,7 +134,7 @@ export default function Navbar() {
             width={320}
             height={320}
             loading="eager"
-            className="h-40 w-auto shrink-0 object-contain sm:h-48"
+            className="h-40 w-auto shrink-0 origin-left scale-[1.15] object-contain sm:h-48"
           />
         </Link>
 

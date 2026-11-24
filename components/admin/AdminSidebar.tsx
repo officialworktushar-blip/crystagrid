@@ -155,7 +155,7 @@ export default function AdminSidebar({
               alt=""
               width={256}
               height={256}
-              className="h-16 w-auto shrink-0 object-contain"
+              className="h-16 w-auto shrink-0 origin-left scale-[1.15] object-contain"
             />
             <span className="shrink-0 rounded-full border border-sky-400/25 bg-sky-400/10 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.16em] text-sky-200">
               ADMIN

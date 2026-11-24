@@ -24,7 +24,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               alt=""
               width={384}
               height={384}
-              className="h-20 w-auto object-contain"
+              className="h-20 w-auto origin-left scale-[1.15] object-contain"
             />
           </Link>
         </div>

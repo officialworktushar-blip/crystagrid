@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 const solutions = [
   { href: "/book", label: "Residential Ads" },
+  { href: "/solutions/digital-signage", label: "Digital Signage" },
 ];
 
 function SolutionsMenu() {
